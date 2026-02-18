@@ -5,6 +5,9 @@ Experimental Julia implementation of the single-source shortest path (SSSP) algo
 > Ran Duan, Jiayi Mao, Xiao Mao, Xinkai Shu, Longhui Yin,  
 > “Breaking the Sorting Barrier for Directed Single-Source Shortest Paths”, STOC 2025.
 
+https://dl.acm.org/doi/10.1145/3717823.3718179
+https://arxiv.org/pdf/2602.12176
+
 The goal of this repository is to provide a readable and hackable version of the Duan–Mao–Mao–Shu–Yin algorithm for directed graphs with non‑negative edge weights, and to make it easy to compare against a standard Dijkstra baseline.
 
 ## Features
