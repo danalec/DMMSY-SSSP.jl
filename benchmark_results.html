@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DMMSY-SSSP Benchmark Results</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: #0f172a;
+            color: #f8fafc;
+            overflow-x: hidden;
+        }
+
+        .glass {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 24px;
+        }
+
+        .gradient-text {
+            background: linear-gradient(135deg, #60a5fa 0%, #a855f7 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        canvas {
+            filter: drop-shadow(0 0 20px rgba(96, 165, 250, 0.2));
+        }
+    </style>
+</head>
+
+<body class="p-8">
+    <div class="max-w-6xl mx-auto">
+        <header class="mb-12 text-center animate-fade-in">
+            <h1 class="text-5xl font-bold mb-4 gradient-text">SSSP Algorithm Performance</h1>
+            <p class="text-slate-400 text-xl font-light">Breaking the Sorting Barrier: Dijkstra vs DMMSY</p>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-4 gap-8 mb-12">
+            <div class="lg:col-span-3 glass p-8 shadow-2xl">
+                <div class="flex items-center justify-between mb-8">
+                    <h2 class="text-2xl font-semibold">Time vs Graph Size (n)</h2>
+                    <div class="flex space-x-4 text-sm text-slate-400">
+                        <span class="flex items-center">
+                            <div class="w-3 h-3 bg-blue-400 rounded-full mr-2"></div> Dijkstra
+                        </span>
+                        <span class="flex items-center">
+                            <div class="w-3 h-3 bg-purple-400 rounded-full mr-2"></div> DMMSY Opt
+                        </span>
+                        <span class="flex items-center">
+                            <div class="w-3 h-3 bg-pink-400 rounded-full mr-2"></div> DMMSY Res
+                        </span>
+                    </div>
+                </div>
+                <div style="height: 450px;">
+                    <canvas id="benchmarkChart"></canvas>
+                </div>
+            </div>
+
+            <div class="space-y-8">
+                <div class="glass p-6 text-center">
+                    <p class="text-slate-400 text-sm mb-1 uppercase tracking-wider">Max n Tested</p>
+                    <p class="text-4xl font-bold text-white">50,000</p>
+                </div>
+                <div class="glass p-6 text-center">
+                    <p class="text-slate-400 text-sm mb-1 uppercase tracking-wider">Avg Speedup (Opt)</p>
+                    <p class="text-4xl font-bold text-blue-400" id="avgSpeedup">1.0x</p>
+                </div>
+                <div class="glass p-6 text-center">
+                    <p class="text-slate-400 text-sm mb-1 uppercase tracking-wider">Complexity</p>
+                    <p class="text-2xl font-bold text-purple-400">O(m log<sup>2/3</sup> n)</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="glass p-8 overflow-hidden">
+            <h3 class="text-xl font-semibold mb-6">Raw Benchmarking Data (ms)</h3>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left">
+                    <thead>
+                        <tr class="text-slate-400 border-b border-slate-700">
+                            <th class="pb-3 pr-4">Vertices (n)</th>
+                            <th class="pb-3 pr-4">Edges (m)</th>
+                            <th class="pb-3 pr-4">Dijkstra</th>
+                            <th class="pb-3 pr-4">DMMSY Opt</th>
+                            <th class="pb-3 pr-4">DMMSY Res</th>
+                            <th class="pb-3">Speedup (Opt)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="dataTable">
+                        <!-- Data injected by JS -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const rawData = [
+            [100, 500, 0.003275, 0.003455, 0.003520],
+            [500, 2000, 0.017545, 0.018710, 0.019100],
+            [1000, 5000, 0.052453, 0.073633, 0.052900],
+            [2500, 12500, 0.296860, 0.288280, 1.388290],
+            [5000, 25000, 0.720980, 0.751080, 4.658140],
+            [10000, 50000, 1.590100, 1.554833, 9.818100],
+            [25000, 125000, 4.758000, 4.600700, 61.390400],
+            [50000, 250000, 12.391900, 10.688700, 98.502500]
+        ];
+
+        const ctx = document.getElementById('benchmarkChart').getContext('2d');
+        const labels = rawData.map(d => d[0].toLocaleString());
+
+        const chart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'Dijkstra',
+                        data: rawData.map(d => d[2]),
+                        borderColor: '#60a5fa',
+                        backgroundColor: 'rgba(96, 165, 250, 0.1)',
+                        borderWidth: 3,
+                        tension: 0.4,
+                        fill: true,
+                        pointRadius: 4,
+                        pointBackgroundColor: '#60a5fa'
+                    },
+                    {
+                        label: 'DMMSY Opt',
+                        data: rawData.map(d => d[3]),
+                        borderColor: '#a855f7',
+                        backgroundColor: 'rgba(168, 85, 247, 0.1)',
+                        borderWidth: 3,
+                        tension: 0.4,
+                        fill: true,
+                        pointRadius: 4,
+                        pointBackgroundColor: '#a855f7'
+                    },
+                    {
+                        label: 'DMMSY Res',
+                        data: rawData.map(d => d[4]),
+                        borderColor: '#ec4899',
+                        backgroundColor: 'rgba(236, 72, 153, 0.1)',
+                        borderWidth: 3,
+                        tension: 0.4,
+                        fill: true,
+                        pointRadius: 4,
+                        pointBackgroundColor: '#ec4899'
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                        ticks: { color: '#94a3b8' }
+                    },
+                    y: {
+                        type: 'logarithmic',
+                        grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                        ticks: { color: '#94a3b8' }
+                    }
+                },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: '#1e293b',
+                        titleColor: '#f8fafc',
+                        bodyColor: '#f8fafc',
+                        borderColor: 'rgba(255, 255, 255, 0.1)',
+                        borderWidth: 1,
+                        padding: 12
+                    }
+                }
+            }
+        });
+
+        // Fill Table
+        let totalSpeedup = 0;
+        const tbody = document.getElementById('dataTable');
+        rawData.forEach(d => {
+            const speedup = d[2] / d[3];
+            totalSpeedup += speedup;
+            const row = `
+                <tr class="border-b border-slate-700 hover:bg-slate-800/50 transition-colors">
+                    <td class="py-4 text-slate-300 font-medium">${d[0].toLocaleString()}</td>
+                    <td class="py-4 text-slate-500">${d[1].toLocaleString()}</td>
+                    <td class="py-4 text-blue-400">${d[2].toFixed(4)}</td>
+                    <td class="py-4 text-purple-400">${d[3].toFixed(4)}</td>
+                    <td class="py-4 text-pink-400">${d[4].toFixed(4)}</td>
+                    <td class="py-4 ${speedup >= 1 ? 'text-emerald-400' : 'text-rose-400'} font-semibold">${speedup.toFixed(2)}x</td>
+                </tr>
+            `;
+            tbody.innerHTML += row;
+        });
+
+        document.getElementById('avgSpeedup').innerText = (totalSpeedup / rawData.length).toFixed(2) + 'x';
+
+    </script>
+</body>
+
+</html>
