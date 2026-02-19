@@ -84,7 +84,11 @@ We welcome contributions to further improve the performance of this implementati
 ## References
 
 1. Duan, R., Mao, J., Mao, X., Shu, X., & Yin, L. (2025). "Breaking the Sorting Barrier for Directed Single-Source Shortest Paths". *Proceedings of the 57th Annual ACM Symposium on Theory of Computing (STOC 2025)*.
-2. [arXiv:2602.12176](https://arxiv.org/pdf/2602.12176)
+2. [arXiv:2504.17033](https://arxiv.org/pdf/2504.17033)
+3. [ACM Digital Library](https://dl.acm.org/doi/10.1145/3717823.3718179)
+4. [MPI-INF repository](https://pure.mpg.de/pubman/faces/ViewItemFullPage.jsp?itemId=item_3634229)
+
+
 
 ## License
 
