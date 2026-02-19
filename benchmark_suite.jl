@@ -20,14 +20,20 @@ using Printf
 function run_benchmark_collection()
     # Configuration: (n, m, trials)
     test_cases = [
-        (100, 500, 20),
-        (500, 2000, 20),
-        (1000, 5000, 15),
-        (2500, 12500, 10),
-        (5000, 25000, 5),
-        (10000, 50000, 3),
-        (25000, 125000, 2),
-        (50000, 250000, 1)
+        (1000, 5000, 100),
+        (10000, 50000, 50),
+        (25000, 125000, 30),
+        (50000, 250000, 20),
+        (100000, 500000, 15),
+        (125000, 625000, 12),
+        (150000, 750000, 10),
+        (175000, 875000, 8),
+        (200000, 1000000, 8),
+        (300000, 1500000, 5),
+        (400000, 2000000, 4),
+        (500000, 2500000, 4),
+        (750000, 3750000, 2),
+        (1000000, 5000000, 2)
     ]
 
     println("DMMSY Data Collection Started...")
@@ -45,7 +51,15 @@ function run_benchmark_collection()
             g = random_graph(n, m, 100.0)
             source = 1
 
-            # Warm-up (Ensures JIT compilation is finished before recording)
+            # Robust Warm-up
+            g_warm = random_graph(100, 500, 100.0)
+            for _ in 1:5
+                DijkstraModule.dijkstra_ref(g_warm, 1)
+                DMMSYSSSP.ssp_duan(g_warm, 1)
+                DMMSYResearch.ssp_duan_research(g_warm, 1)
+            end
+            
+            # Specific Warm-up
             DijkstraModule.dijkstra_ref(g, source)
             DMMSYSSSP.ssp_duan(g, source)
             DMMSYResearch.ssp_duan_research(g, source)
@@ -63,6 +77,7 @@ function run_benchmark_collection()
             # Log to file
             @printf(f, "%d,%d,%.6f,%.6f,%.6f\n", n, m, avg_dij, avg_opt, avg_res)
             
+            @printf("dijkstra: %.4fms, opt: %.4fms, res: %.4fms -> Spd: %.2fx\n", avg_dij, avg_opt, avg_res, avg_dij/avg_opt)
             println("Done.")
         end
     end

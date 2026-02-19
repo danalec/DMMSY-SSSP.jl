@@ -4,208 +4,238 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DMMSY-SSSP Benchmark Results</title>
+    <title>DMMSY-SSSP Live Benchmarks</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
     <style>
         body {
             font-family: 'Outfit', sans-serif;
-            background: #0f172a;
+            background: #0b0f19;
             color: #f8fafc;
             overflow-x: hidden;
         }
 
         .glass {
-            background: rgba(30, 41, 59, 0.7);
-            backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 24px;
+            background: rgba(17, 24, 39, 0.8);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 20px;
         }
 
         .gradient-text {
-            background: linear-gradient(135deg, #60a5fa 0%, #a855f7 100%);
+            background: linear-gradient(135deg, #38bdf8 0%, #ec4899 50%, #f472b6 100%);
             -webkit-background-clip: text;
             background-clip: text;
             -webkit-text-fill-color: transparent;
         }
 
         canvas {
-            filter: drop-shadow(0 0 20px rgba(96, 165, 250, 0.2));
+            filter: drop-shadow(0 0 30px rgba(236, 72, 153, 0.15));
+        }
+
+        .tab-active {
+            border-bottom: 2px solid #38bdf8;
+            color: #38bdf8;
         }
     </style>
 </head>
 
-<body class="p-8">
+<body class="p-4 md:p-12">
     <div class="max-w-6xl mx-auto">
-        <header class="mb-12 text-center animate-fade-in">
-            <h1 class="text-5xl font-bold mb-4 gradient-text">SSSP Algorithm Performance</h1>
-            <p class="text-slate-400 text-xl font-light">Breaking the Sorting Barrier: Dijkstra vs DMMSY</p>
+        <header class="mb-12 text-center">
+            <h1 class="text-5xl font-bold mb-4 gradient-text">DMMSY Algorithm Performance</h1>
+            <p class="text-slate-400 text-xl font-light">Breaking the $O(m \log n)$ Barrier — Deterministic SSSP @ STOC
+                '25</p>
         </header>
 
-        <div class="grid grid-cols-1 lg:grid-cols-4 gap-8 mb-12">
-            <div class="lg:col-span-3 glass p-8 shadow-2xl">
-                <div class="flex items-center justify-between mb-8">
-                    <h2 class="text-2xl font-semibold">Time vs Graph Size (n)</h2>
-                    <div class="flex space-x-4 text-sm text-slate-400">
-                        <span class="flex items-center">
-                            <div class="w-3 h-3 bg-blue-400 rounded-full mr-2"></div> Dijkstra
-                        </span>
-                        <span class="flex items-center">
-                            <div class="w-3 h-3 bg-purple-400 rounded-full mr-2"></div> DMMSY Opt
-                        </span>
-                        <span class="flex items-center">
-                            <div class="w-3 h-3 bg-pink-400 rounded-full mr-2"></div> DMMSY Res
-                        </span>
-                    </div>
-                </div>
-                <div style="height: 450px;">
-                    <canvas id="benchmarkChart"></canvas>
-                </div>
-            </div>
-
-            <div class="space-y-8">
-                <div class="glass p-6 text-center">
-                    <p class="text-slate-400 text-sm mb-1 uppercase tracking-wider">Max n Tested</p>
-                    <p class="text-4xl font-bold text-white">50,000</p>
-                </div>
-                <div class="glass p-6 text-center">
-                    <p class="text-slate-400 text-sm mb-1 uppercase tracking-wider">Avg Speedup (Opt)</p>
-                    <p class="text-4xl font-bold text-blue-400" id="avgSpeedup">1.0x</p>
-                </div>
-                <div class="glass p-6 text-center">
-                    <p class="text-slate-400 text-sm mb-1 uppercase tracking-wider">Complexity</p>
-                    <p class="text-2xl font-bold text-purple-400">O(m log<sup>2/3</sup> n)</p>
-                </div>
+        <div class="flex justify-center mb-8 gap-4">
+            <div class="glass px-6 py-4 flex items-center space-x-4">
+                <span class="text-sm text-slate-500 uppercase tracking-widest">Data Source:</span>
+                <span id="sourceIndicator" class="text-sky-400 font-bold">Embedded CSV</span>
+                <label
+                    class="cursor-pointer bg-slate-800 hover:bg-slate-700 px-3 py-1 rounded text-xs transition-colors">
+                    Upload CSV
+                    <input type="file" id="csvUpload" class="hidden" accept=".csv">
+                </label>
             </div>
         </div>
 
-        <div class="glass p-8 overflow-hidden">
-            <h3 class="text-xl font-semibold mb-6">Raw Benchmarking Data (ms)</h3>
+        <!-- Stats Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div class="glass p-6 text-center border-t-4 border-sky-500/30">
+                <p class="text-slate-500 text-xs uppercase tracking-[0.2em] mb-2">Max Nodes</p>
+                <p id="statNodes" class="text-3xl font-bold text-white">-</p>
+            </div>
+            <div class="glass p-6 text-center border-t-4 border-pink-500/30">
+                <p class="text-slate-500 text-xs uppercase tracking-[0.2em] mb-2">Best Speedup</p>
+                <p id="statSpeedup" class="text-3xl font-bold text-pink-400">-</p>
+            </div>
+            <div class="glass p-6 text-center border-t-4 border-cyan-500/30">
+                <p class="text-slate-500 text-xs uppercase tracking-[0.2em] mb-2">Avg Speedup</p>
+                <p id="statAvgSpeedup" class="text-3xl font-bold text-cyan-400">-</p>
+            </div>
+            <div class="glass p-6 text-center border-t-4 border-pink-500/30">
+                <p class="text-slate-500 text-xs uppercase tracking-[0.2em] mb-2">Complexity</p>
+                <p class="text-3xl font-bold text-pink-400">O(m log<sup>2/3</sup> n)</p>
+            </div>
+        </div>
+
+        <!-- Main Chart -->
+        <div class="glass p-8 mb-8">
+            <div class="flex flex-col md:flex-row items-center justify-between mb-8 gap-4">
+                <h2 class="text-2xl font-semibold">Performance Scaling</h2>
+                <div class="flex items-center space-x-6">
+                    <div class="flex items-center"><span class="w-3 h-3 bg-sky-400 rounded-full mr-2"></span> Dijkstra
+                    </div>
+                    <div class="flex items-center"><span class="w-3 h-3 bg-pink-400 rounded-full mr-2"></span> DMMSY
+                        (Opt)</div>
+                </div>
+            </div>
+            <div style="height: 480px;">
+                <canvas id="benchmarkChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Raw Data Table -->
+        <div class="glass p-8">
+            <h3 class="text-xl font-semibold mb-6 uppercase tracking-widest text-slate-500 text-center">Benchmarks
+                Details</h3>
             <div class="overflow-x-auto">
-                <table class="w-full text-left">
+                <table class="w-full text-left text-sm">
                     <thead>
-                        <tr class="text-slate-400 border-b border-slate-700">
-                            <th class="pb-3 pr-4">Vertices (n)</th>
-                            <th class="pb-3 pr-4">Edges (m)</th>
-                            <th class="pb-3 pr-4">Dijkstra</th>
-                            <th class="pb-3 pr-4">DMMSY Opt</th>
-                            <th class="pb-3 pr-4">DMMSY Res</th>
-                            <th class="pb-3">Speedup (Opt)</th>
+                        <tr class="text-slate-500 border-b border-slate-800">
+                            <th class="pb-4 font-normal">Nodes (n)</th>
+                            <th class="pb-4 font-normal text-right">Edges (m)</th>
+                            <th class="pb-4 font-normal text-right">Dijkstra (ms)</th>
+                            <th class="pb-4 font-normal text-right">DMMSY (ms)</th>
+                            <th class="pb-4 font-normal text-right">Speedup</th>
                         </tr>
                     </thead>
-                    <tbody id="dataTable">
-                        <!-- Data injected by JS -->
-                    </tbody>
+                    <tbody id="dataTable" class="divide-y divide-slate-800/50"></tbody>
                 </table>
             </div>
         </div>
     </div>
 
+    <script id="embeddedData">
+        const EMBEDDED_DATA = `n,m,dijkstra,dmmsy_opt,dmmsy_res
+1000,5000,0.053719,0.148043,0.000000
+10000,50000,2.919582,1.656244,0.000000
+25000,125000,6.579060,1.802760,0.000000
+50000,250000,13.119955,3.924660,0.000000
+100000,500000,34.764780,19.721867,0.000000
+125000,625000,40.563083,18.081208,0.000000
+150000,750000,53.979140,25.347330,0.000000
+175000,875000,71.393612,33.238037,0.000000
+200000,1000000,73.483262,35.185212,0.000000
+300000,1500000,132.249720,65.849460,0.000000
+400000,2000000,163.557000,98.736700,0.000000
+500000,2500000,238.467350,121.484925,0.000000
+750000,3750000,397.214300,217.042300,0.000000
+1000000,5000000,534.145450,357.959200,0.000000
+`;
+    </script>
+
     <script>
-        const rawData = [
-            [100, 500, 0.003275, 0.003455, 0.003520],
-            [500, 2000, 0.017545, 0.018710, 0.019100],
-            [1000, 5000, 0.052453, 0.073633, 0.052900],
-            [2500, 12500, 0.296860, 0.288280, 1.388290],
-            [5000, 25000, 0.720980, 0.751080, 4.658140],
-            [10000, 50000, 1.590100, 1.554833, 9.818100],
-            [25000, 125000, 4.758000, 4.600700, 61.390400],
-            [50000, 250000, 12.391900, 10.688700, 98.502500]
-        ];
+        let chartInstance = null;
 
-        const ctx = document.getElementById('benchmarkChart').getContext('2d');
-        const labels = rawData.map(d => d[0].toLocaleString());
+        function parseCSV(text) {
+            const lines = text.trim().split('\n').slice(1);
+            return lines.map(line => {
+                const [n, m, dij, opt] = line.split(',').map(Number);
+                return { n, m, dij, opt, spd: dij / opt };
+            }).filter(d => !isNaN(d.n));
+        }
 
-        const chart = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: labels,
-                datasets: [
-                    {
-                        label: 'Dijkstra',
-                        data: rawData.map(d => d[2]),
-                        borderColor: '#60a5fa',
-                        backgroundColor: 'rgba(96, 165, 250, 0.1)',
-                        borderWidth: 3,
-                        tension: 0.4,
-                        fill: true,
-                        pointRadius: 4,
-                        pointBackgroundColor: '#60a5fa'
-                    },
-                    {
-                        label: 'DMMSY Opt',
-                        data: rawData.map(d => d[3]),
-                        borderColor: '#a855f7',
-                        backgroundColor: 'rgba(168, 85, 247, 0.1)',
-                        borderWidth: 3,
-                        tension: 0.4,
-                        fill: true,
-                        pointRadius: 4,
-                        pointBackgroundColor: '#a855f7'
-                    },
-                    {
-                        label: 'DMMSY Res',
-                        data: rawData.map(d => d[4]),
-                        borderColor: '#ec4899',
-                        backgroundColor: 'rgba(236, 72, 153, 0.1)',
-                        borderWidth: 3,
-                        tension: 0.4,
-                        fill: true,
-                        pointRadius: 4,
-                        pointBackgroundColor: '#ec4899'
-                    }
-                ]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    x: {
-                        grid: { color: 'rgba(255, 255, 255, 0.05)' },
-                        ticks: { color: '#94a3b8' }
-                    },
-                    y: {
-                        type: 'logarithmic',
-                        grid: { color: 'rgba(255, 255, 255, 0.05)' },
-                        ticks: { color: '#94a3b8' }
-                    }
-                },
-                plugins: {
-                    legend: { display: false },
-                    tooltip: {
-                        backgroundColor: '#1e293b',
-                        titleColor: '#f8fafc',
-                        bodyColor: '#f8fafc',
-                        borderColor: 'rgba(255, 255, 255, 0.1)',
-                        borderWidth: 1,
-                        padding: 12
-                    }
-                }
-            }
-        });
+        function updateUI(data, sourceName) {
+            document.getElementById('sourceIndicator').innerText = sourceName;
 
-        // Fill Table
-        let totalSpeedup = 0;
-        const tbody = document.getElementById('dataTable');
-        rawData.forEach(d => {
-            const speedup = d[2] / d[3];
-            totalSpeedup += speedup;
-            const row = `
-                <tr class="border-b border-slate-700 hover:bg-slate-800/50 transition-colors">
-                    <td class="py-4 text-slate-300 font-medium">${d[0].toLocaleString()}</td>
-                    <td class="py-4 text-slate-500">${d[1].toLocaleString()}</td>
-                    <td class="py-4 text-blue-400">${d[2].toFixed(4)}</td>
-                    <td class="py-4 text-purple-400">${d[3].toFixed(4)}</td>
-                    <td class="py-4 text-pink-400">${d[4].toFixed(4)}</td>
-                    <td class="py-4 ${speedup >= 1 ? 'text-emerald-400' : 'text-rose-400'} font-semibold">${speedup.toFixed(2)}x</td>
+            // Stats
+            const maxN = data[data.length - 1].n;
+            const speedups = data.map(d => d.spd);
+            const maxSpd = Math.max(...speedups);
+            const avgSpd = speedups.reduce((a, b) => a + b, 0) / speedups.length;
+
+            document.getElementById('statNodes').innerText = maxN.toLocaleString();
+            document.getElementById('statSpeedup').innerText = maxSpd.toFixed(2) + 'x';
+            document.getElementById('statAvgSpeedup').innerText = avgSpd.toFixed(2) + 'x';
+
+            // Table
+            document.getElementById('dataTable').innerHTML = data.map(d => `
+                <tr class="hover:bg-slate-800/40 transition-colors">
+                    <td class="py-4 font-medium text-slate-200">${d.n.toLocaleString()}</td>
+                    <td class="py-4 text-right text-slate-500">${d.m.toLocaleString()}</td>
+                    <td class="py-4 text-right text-sky-400/70 font-mono">${d.dij.toFixed(4)}</td>
+                    <td class="py-4 text-right text-pink-400 font-mono font-bold">${d.opt.toFixed(4)}</td>
+                    <td class="py-4 text-right">
+                        <span class="px-2 py-1 rounded-md text-xs font-bold ${d.spd >= 1 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}">
+                            ${d.spd.toFixed(2)}x
+                        </span>
+                    </td>
                 </tr>
-            `;
-            tbody.innerHTML += row;
+            `).join('');
+
+            // Chart
+            const ctx = document.getElementById('benchmarkChart').getContext('2d');
+            if (chartInstance) chartInstance.destroy();
+            chartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: data.map(d => d.n.toLocaleString()),
+                    datasets: [
+                        {
+                            label: 'Dijkstra',
+                            data: data.map(d => d.dij),
+                            borderColor: '#38bdf8',
+                            backgroundColor: 'rgba(56, 189, 248, 0.05)',
+                            fill: true,
+                            tension: 0.3,
+                            borderWidth: 3,
+                            pointRadius: 4
+                        },
+                        {
+                            label: 'DMMSY Opt',
+                            data: data.map(d => d.opt),
+                            borderColor: '#ec4899',
+                            backgroundColor: 'rgba(236, 72, 153, 0.05)',
+                            fill: true,
+                            tension: 0.3,
+                            borderWidth: 3,
+                            pointRadius: 4
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: { type: 'logarithmic', grid: { color: 'rgba(255,255,255,0.02)' }, ticks: { color: '#64748b' } },
+                        x: { grid: { display: false }, ticks: { color: '#64748b' } }
+                    },
+                    plugins: { legend: { display: false } }
+                }
+            });
+        }
+
+        // 1. Try Fetch (Local Server)
+        fetch('benchmark_data.csv')
+            .then(r => r.text())
+            .then(text => updateUI(parseCSV(text), 'benchmarks_data.csv'))
+            .catch(() => {
+                // 2. Fallback to Embedded
+                if (typeof EMBEDDED_DATA !== 'undefined') {
+                    updateUI(parseCSV(EMBEDDED_DATA), 'Embedded Buffer');
+                }
+            });
+
+        // 3. User Upload
+        document.getElementById('csvUpload').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            const reader = new FileReader();
+            reader.onload = (re) => updateUI(parseCSV(re.target.result), file.name);
+            reader.readAsText(file);
         });
-
-        document.getElementById('avgSpeedup').innerText = (totalSpeedup / rawData.length).toFixed(2) + 'x';
-
     </script>
 </body>
 
