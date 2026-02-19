@@ -4,6 +4,8 @@ bench_report_collector.jl — High-Precision Performance Data Gatherer & Reporte
 Syncs results to CSV and auto-integrates into benchmark_results.html.
 """
 
+using LinearAlgebra
+
 include("CSRGraph.jl")
 include("Dijkstra.jl")
 include("DMMSY-SSSP.jl")
@@ -35,57 +37,55 @@ function run_report_benchmark()
     ]
 
     println("DMMSY Synchronized Performance Reporter (v5.6)")
-    
+
     # Correctness checks
     if !DMMSYSSSP.verify_correctness()
         println("Optimized Correctness check FAILED. Aborting.")
         return
     end
-    
+    if !DMMSYResearch.verify_research_correctness()
+        println("Research Correctness check FAILED. Aborting.")
+        return
+    end
+
     println("===========================================================================")
     @printf("%-10s %-10s %-12s %-12s %-12s %-8s\n", "n", "m", "Dijkstra", "DMMSY Opt", "DMMSY Res", "Spd(Opt)")
     println("---------------------------------------------------------------------------")
 
     output_file = "benchmark_data.csv"
-    
+
     open(output_file, "w") do f
         println(f, "n,m,dijkstra,dmmsy_opt,dmmsy_res")
-        
+
         for (n, m, trials) in test_cases
             g = random_graph(n, m, 100.0)
             source = 1
 
-            # Warm-up
-            for _ in 1:2
+            # Warm-up for all implementations (fair comparison)
+            for _ in 1:min(5, trials ÷ 2)
                 DijkstraModule.dijkstra_ref(g, source)
                 DMMSYSSSP.ssp_duan(g, source)
-                if n <= 50000; DMMSYResearch.ssp_duan_research(g, source) end
-            end
-            
-            # Research version restricted to manageable sizes
-            t_res_val = 0.0
-            if n <= 100000
-                t_res = @elapsed for _ in 1:trials DMMSYResearch.ssp_duan_research(g, source) end
-                t_res_val = (t_res / trials) * 1000
+                DMMSYResearch.ssp_duan_research(g, source)
             end
 
-            # Execution for Optimized versions
+            # Execution for all implementations with consistent trials
             t_dij = @elapsed for _ in 1:trials DijkstraModule.dijkstra_ref(g, source) end
             t_opt = @elapsed for _ in 1:trials DMMSYSSSP.ssp_duan(g, source) end
+            t_res = @elapsed for _ in 1:trials DMMSYResearch.ssp_duan_research(g, source) end
 
             avg_dij = (t_dij / trials) * 1000
             avg_opt = (t_opt / trials) * 1000
+            avg_res = (t_res / trials) * 1000
             spd = avg_dij / avg_opt
 
-            res_str = n <= 100000 ? @sprintf("%-12.4f", t_res_val) : "Skipped"
-            @printf("%-10d %-10d %-12.4f %-12.4f %-12s %-8.2fx\n", n, m, avg_dij, avg_opt, res_str, spd)
-            @printf(f, "%d,%d,%.6f,%.6f,%.6f\n", n, m, avg_dij, avg_opt, t_res_val)
+            @printf("%-10d %-10d %-12.4f %-12.4f %-12.4f %-8.2fx\n", n, m, avg_dij, avg_opt, avg_res, spd)
+            @printf(f, "%d,%d,%.6f,%.6f,%.6f\n", n, m, avg_dij, avg_opt, avg_res)
         end
     end
 
     println("===========================================================================")
     println("Full benchmark complete. Results saved to $output_file")
-    
+
     # Auto-embed into HTML for visualization
     try
         csv_data = read(output_file, String)

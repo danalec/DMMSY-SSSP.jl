@@ -52,7 +52,10 @@ function get_dijkstra_ws(n::Int, ::Type{T}, ::Type{W}) where {T, W}
     ws = get!(tls, key) do
         DijkstraWorkspace{T, W}(fill(typemax(W), n), zeros(T, n), Vector{W}(undef, n), Vector{T}(undef, n), zeros(T, n), zeros(Int, n), 0)
     end::DijkstraWorkspace{T, W}
-    if length(ws.d) < n; ws = DijkstraWorkspace{T, W}(fill(typemax(W), n), zeros(T, n), Vector{W}(undef, n), Vector{T}(undef, n), zeros(T, n), zeros(Int, n), 0); tls[key] = ws end
+    if length(ws.d) != n
+        ws = DijkstraWorkspace{T, W}(fill(typemax(W), n), zeros(T, n), Vector{W}(undef, n), Vector{T}(undef, n), zeros(T, n), zeros(Int, n), 0)
+        tls[key] = ws
+    end
     return ws
 end
 

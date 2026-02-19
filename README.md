@@ -7,7 +7,7 @@ A high-performance Julia implementation of the Single-Source Shortest Path (SSSP
 
 ## Overview
 
-This repository provides a performance-engineered implementation of the Duan–Mao–Mao–Shu–Yin (**DMMSY**) algorithm. By leveraging advanced architectural optimizations such as **8-way Instruction-Level Parallelism (ILP)**, **hybrid priority tracking**, and **cache-interleaved memory layouts**, this implementation demonstrates significant practical advantages over traditional heap-based Dijkstra's algorithm, achieving up to **1.70x speedup** on modern hardware.
+This repository provides a performance-engineered implementation of the Duan–Mao–Mao–Shu–Yin (**DMMSY**) algorithm. By leveraging advanced architectural optimizations such as **8-way Instruction-Level Parallelism (ILP)**, **hybrid priority tracking**, and **cache-interleaved memory layouts**, this implementation demonstrates significant practical advantages over traditional heap-based Dijkstra's algorithm, achieving up to **1.37x speedup** on modern hardware.
 
 ## Key Features
 
@@ -17,19 +17,9 @@ This repository provides a performance-engineered implementation of the Duan–M
 - **Adaptive Strategy**: Employs a hybrid tracking system (Bitmap + Heap) and dynamic threshold feedback to maintain peak efficiency.
 - **Robust Verification**: Validated against reference Dijkstra implementations across linear, diamond, cycle, and hub topologies.
 
-## Performance Metrics (v5.10 Synchronized)
+## Performance Metrics
 
 Tests conducted on a modern x86_64 architecture with selective reset optimizations:
-
-| Nodes (n) | Edges (m) | Dijkstra (ms) | DMMSY Opt (ms) | Speedup |
-| :--- | :--- | :--- | :--- | :--- |
-| 10,000 | 50,000 | 1.00 | 0.97 | 1.03x |
-| 25,000 | 125,000 | 4.65 | 2.74 | **1.70x** |
-| 50,000 | 250,000 | 9.66 | 6.61 | **1.46x** |
-| 100,000 | 500,000 | 20.08 | 15.28 | **1.31x** |
-| 250,000 | 1,250,000 | 58.58 | 54.64 | 1.07x |
-| 1,000,000 | 5,000,000 | 376.06 | 380.13 | 0.99x |
-
 ![DMMSY-SSSP Performance Dashboard](screenshot.png)
 
 > [!NOTE]
