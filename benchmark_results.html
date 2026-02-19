@@ -31,12 +31,7 @@
         }
 
         canvas {
-            filter: drop-shadow(0 0 30px rgba(236, 72, 153, 0.15));
-        }
-
-        .tab-active {
-            border-bottom: 2px solid #38bdf8;
-            color: #38bdf8;
+            filter: drop-shadow(0 0 30px rgba(56, 189, 248, 0.1));
         }
     </style>
 </head>
@@ -63,21 +58,21 @@
 
         <!-- Stats Grid -->
         <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-            <div class="glass p-6 text-center border-t-4 border-sky-500/30">
+            <div class="glass p-6 text-center border-t-4 border-slate-500/30">
                 <p class="text-slate-500 text-xs uppercase tracking-[0.2em] mb-2">Max Nodes</p>
                 <p id="statNodes" class="text-3xl font-bold text-white">-</p>
             </div>
-            <div class="glass p-6 text-center border-t-4 border-pink-500/30">
+            <div class="glass p-6 text-center border-t-4 border-sky-500/30">
                 <p class="text-slate-500 text-xs uppercase tracking-[0.2em] mb-2">Best Speedup</p>
-                <p id="statSpeedup" class="text-3xl font-bold text-pink-400">-</p>
-            </div>
-            <div class="glass p-6 text-center border-t-4 border-cyan-500/30">
-                <p class="text-slate-500 text-xs uppercase tracking-[0.2em] mb-2">Avg Speedup</p>
-                <p id="statAvgSpeedup" class="text-3xl font-bold text-cyan-400">-</p>
+                <p id="statSpeedup" class="text-3xl font-bold text-sky-400">-</p>
             </div>
             <div class="glass p-6 text-center border-t-4 border-pink-500/30">
+                <p class="text-slate-500 text-xs uppercase tracking-[0.2em] mb-2">Avg Speedup</p>
+                <p id="statAvgSpeedup" class="text-3xl font-bold text-pink-400">-</p>
+            </div>
+            <div class="glass p-6 text-center border-t-4 border-slate-500/30">
                 <p class="text-slate-500 text-xs uppercase tracking-[0.2em] mb-2">Complexity</p>
-                <p class="text-3xl font-bold text-pink-400">O(m log<sup>2/3</sup> n)</p>
+                <p class="text-3xl font-bold text-slate-400">O(m log<sup>2/3</sup> n)</p>
             </div>
         </div>
 
@@ -86,10 +81,12 @@
             <div class="flex flex-col md:flex-row items-center justify-between mb-8 gap-4">
                 <h2 class="text-2xl font-semibold">Performance Scaling</h2>
                 <div class="flex items-center space-x-6">
-                    <div class="flex items-center"><span class="w-3 h-3 bg-sky-400 rounded-full mr-2"></span> Dijkstra
+                    <div class="flex items-center"><span class="w-3 h-3 bg-slate-400 rounded-full mr-2"></span> Dijkstra
                     </div>
-                    <div class="flex items-center"><span class="w-3 h-3 bg-pink-400 rounded-full mr-2"></span> DMMSY
+                    <div class="flex items-center"><span class="w-3 h-3 bg-sky-400 rounded-full mr-2"></span> DMMSY
                         (Opt)</div>
+                    <div class="flex items-center"><span class="w-3 h-3 bg-pink-400 rounded-full mr-2"></span> DMMSY
+                        (Res)</div>
                 </div>
             </div>
             <div style="height: 480px;">
@@ -107,8 +104,9 @@
                         <tr class="text-slate-500 border-b border-slate-800">
                             <th class="pb-4 font-normal">Nodes (n)</th>
                             <th class="pb-4 font-normal text-right">Edges (m)</th>
-                            <th class="pb-4 font-normal text-right">Dijkstra (ms)</th>
-                            <th class="pb-4 font-normal text-right">DMMSY (ms)</th>
+                            <th class="pb-4 font-normal text-right text-slate-400">Dijkstra (ms)</th>
+                            <th class="pb-4 font-normal text-right text-sky-400">DMMSY Opt (ms)</th>
+                            <th class="pb-4 font-normal text-right text-pink-400">DMMSY Res (ms)</th>
                             <th class="pb-4 font-normal text-right">Speedup</th>
                         </tr>
                     </thead>
@@ -120,20 +118,20 @@
 
     <script id="embeddedData">
         const EMBEDDED_DATA = `n,m,dijkstra,dmmsy_opt,dmmsy_res
-1000,5000,0.053719,0.148043,0.000000
-10000,50000,2.919582,1.656244,0.000000
-25000,125000,6.579060,1.802760,0.000000
-50000,250000,13.119955,3.924660,0.000000
-100000,500000,34.764780,19.721867,0.000000
-125000,625000,40.563083,18.081208,0.000000
-150000,750000,53.979140,25.347330,0.000000
-175000,875000,71.393612,33.238037,0.000000
-200000,1000000,73.483262,35.185212,0.000000
-300000,1500000,132.249720,65.849460,0.000000
-400000,2000000,163.557000,98.736700,0.000000
-500000,2500000,238.467350,121.484925,0.000000
-750000,3750000,397.214300,217.042300,0.000000
-1000000,5000000,534.145450,357.959200,0.000000
+1000,5000,0.024209,0.025253,0.035812
+5000,25000,0.437466,0.500546,0.070699
+10000,50000,1.004636,0.972450,0.089260
+25000,125000,4.648567,2.737387,0.207803
+50000,250000,9.655270,6.605995,0.569160
+75000,375000,14.340760,9.905427,0.833147
+100000,500000,20.084087,15.283327,1.270493
+150000,750000,27.417460,26.814470,0.000000
+200000,1000000,41.877113,40.893625,0.000000
+250000,1250000,58.584450,54.636900,0.000000
+350000,1750000,99.279667,98.357983,0.000000
+500000,2500000,158.377300,165.872700,0.000000
+750000,3750000,267.428933,268.756467,0.000000
+1000000,5000000,376.060800,380.132000,0.000000
 `;
     </script>
 
@@ -143,8 +141,9 @@
         function parseCSV(text) {
             const lines = text.trim().split('\n').slice(1);
             return lines.map(line => {
-                const [n, m, dij, opt] = line.split(',').map(Number);
-                return { n, m, dij, opt, spd: dij / opt };
+                const parts = line.split(',').map(Number);
+                const [n, m, dij, opt, res] = parts;
+                return { n, m, dij, opt, res, spd: dij / opt };
             }).filter(d => !isNaN(d.n));
         }
 
@@ -153,9 +152,9 @@
 
             // Stats
             const maxN = data[data.length - 1].n;
-            const speedups = data.map(d => d.spd);
-            const maxSpd = Math.max(...speedups);
-            const avgSpd = speedups.reduce((a, b) => a + b, 0) / speedups.length;
+            const speedups = data.map(d => d.spd).filter(s => isFinite(s));
+            const maxSpd = speedups.length > 0 ? Math.max(...speedups) : 0;
+            const avgSpd = speedups.length > 0 ? speedups.reduce((a, b) => a + b, 0) / speedups.length : 0;
 
             document.getElementById('statNodes').innerText = maxN.toLocaleString();
             document.getElementById('statSpeedup').innerText = maxSpd.toFixed(2) + 'x';
@@ -166,11 +165,12 @@
                 <tr class="hover:bg-slate-800/40 transition-colors">
                     <td class="py-4 font-medium text-slate-200">${d.n.toLocaleString()}</td>
                     <td class="py-4 text-right text-slate-500">${d.m.toLocaleString()}</td>
-                    <td class="py-4 text-right text-sky-400/70 font-mono">${d.dij.toFixed(4)}</td>
-                    <td class="py-4 text-right text-pink-400 font-mono font-bold">${d.opt.toFixed(4)}</td>
+                    <td class="py-4 text-right text-slate-400 font-mono">${d.dij.toFixed(4)}</td>
+                    <td class="py-4 text-right text-sky-400 font-mono font-bold">${d.opt.toFixed(4)}</td>
+                    <td class="py-4 text-right text-pink-400 font-mono">${(d.res || 0).toFixed(4)}</td>
                     <td class="py-4 text-right">
                         <span class="px-2 py-1 rounded-md text-xs font-bold ${d.spd >= 1 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}">
-                            ${d.spd.toFixed(2)}x
+                            ${(d.spd || 0).toFixed(2)}x
                         </span>
                     </td>
                 </tr>
@@ -187,6 +187,17 @@
                         {
                             label: 'Dijkstra',
                             data: data.map(d => d.dij),
+                            borderColor: '#94a3b8',
+                            backgroundColor: 'rgba(148, 163, 184, 0.05)',
+                            fill: false,
+                            tension: 0.3,
+                            borderWidth: 2,
+                            borderDash: [5, 5],
+                            pointRadius: 3
+                        },
+                        {
+                            label: 'DMMSY Opt',
+                            data: data.map(d => d.opt),
                             borderColor: '#38bdf8',
                             backgroundColor: 'rgba(56, 189, 248, 0.05)',
                             fill: true,
@@ -195,8 +206,8 @@
                             pointRadius: 4
                         },
                         {
-                            label: 'DMMSY Opt',
-                            data: data.map(d => d.opt),
+                            label: 'DMMSY Res',
+                            data: data.map(d => d.res || null),
                             borderColor: '#ec4899',
                             backgroundColor: 'rgba(236, 72, 153, 0.05)',
                             fill: true,
