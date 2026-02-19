@@ -7,25 +7,33 @@ A high-performance Julia implementation of the Single-Source Shortest Path (SSSP
 
 ## Overview
 
-This repository provides a performance-engineered implementation of the Duan–Mao–Mao–Shu–Yin (**DMMSY**) algorithm. By leveraging advanced architectural optimizations such as **8-way Instruction-Level Parallelism (ILP)**, **hybrid priority tracking**, and **cache-interleaved memory layouts**, this implementation demonstrates significant practical advantages over traditional heap-based Dijkstra's algorithm, achieving up to **3.65x speedup** on modern hardware.
+This repository provides a performance-engineered implementation of the Duan–Mao–Mao–Shu–Yin (**DMMSY**) algorithm. By leveraging advanced architectural optimizations such as **8-way Instruction-Level Parallelism (ILP)**, **hybrid priority tracking**, and **cache-interleaved memory layouts**, this implementation demonstrates significant practical advantages over traditional heap-based Dijkstra's algorithm, achieving up to **1.70x speedup** on modern hardware.
 
 ## Key Features
 
 - **Theoretical Breakthrough**: Implements the first deterministic algorithm to break the $O(m \log n)$ sorting barrier for directed graphs, achieving $O(m \log^{2/3} n)$ complexity.
-- **Hardware-Aware Design**: Features 8-way ILP unrolling and software prefetching to maximize pipeline occupancy and hide memory latency.
-- **Cache-Interleaved Layout**: Utilizes a `StructOfArrays` approach to co-locate block metadata and vertex distances, optimizing L1/L2 cache locality.
-- **Adaptive Strategy**: Employs a hybrid tracking system (Bitmap + Heap) and dynamic threshold feedback to maintain peak efficiency across varying graph densities.
+- **Hardware-Aware Design**: Features unrolled priority tracking and software prefetching to maximize pipeline occupancy.
+- **Selective Memory Reset**: Utilizes dirty-index tracking to eliminate $O(n)$ overhead during recursive subproblem resets.
+- **Adaptive Strategy**: Employs a hybrid tracking system (Bitmap + Heap) and dynamic threshold feedback to maintain peak efficiency.
 - **Robust Verification**: Validated against reference Dijkstra implementations across linear, diamond, cycle, and hub topologies.
 
-## Performance Metrics
+## Performance Metrics (v5.10 Synchronized)
 
-Tests conducted on a modern x86_64 architecture (results may vary by hardware):
+Tests conducted on a modern x86_64 architecture with selective reset optimizations:
+
+| Nodes (n) | Edges (m) | Dijkstra (ms) | DMMSY Opt (ms) | Speedup |
+| :--- | :--- | :--- | :--- | :--- |
+| 10,000 | 50,000 | 1.00 | 0.97 | 1.03x |
+| 25,000 | 125,000 | 4.65 | 2.74 | **1.70x** |
+| 50,000 | 250,000 | 9.66 | 6.61 | **1.46x** |
+| 100,000 | 500,000 | 20.08 | 15.28 | **1.31x** |
+| 250,000 | 1,250,000 | 58.58 | 54.64 | 1.07x |
+| 1,000,000 | 5,000,000 | 376.06 | 380.13 | 0.99x |
 
 ![DMMSY-SSSP Performance Dashboard](screenshot.png)
 
 > [!NOTE]
-> The algorithm achieves its maximum performance delta at the 25k–200k node scale, where the reduction in sorting overhead and enhanced memory locality most effectively mitigate the bottlenecks of standard priority queues.
-
+> The algorithm achieves its maximum performance delta at the 25k–100k node scale, where the reduction in sorting overhead and enhanced memory locality most effectively mitigate the bottlenecks of standard priority queues.
 
 
 ## Core Optimizations
@@ -42,7 +50,7 @@ Tests conducted on a modern x86_64 architecture (results may vary by hardware):
 - `CSRGraph.jl`: High-performance Compressed Sparse Row (CSR) graph implementation.
 - `Dijkstra.jl`: Reference implementation used for correctness and performance baselines.
 - `DMMSY_Research.jl`: Baseline research implementation for algorithmic comparison.
-- `full_benchmark.jl`: Main benchmarking driver.
+- `bench_report_collector.jl`: Main high-precision benchmarking and reporting driver.
 - `benchmark_results.html`: Visualization for performance data.
 - `benchmark_data.csv`: Raw timing metrics.
 
@@ -73,7 +81,7 @@ verify_correctness()
 
 To generate a full performance report:
 ```bash
-julia full_benchmark.jl
+julia bench_report_collector.jl
 ```
 
 ## Contributing
