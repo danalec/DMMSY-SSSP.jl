@@ -1,3 +1,4 @@
+
 #!/usr/bin/env julia
 """
 bench_report_collector.jl — High-Precision Performance Data Gatherer & Reporter.
@@ -6,16 +7,19 @@ Syncs results to CSV and auto-integrates into benchmark_results.html.
 
 using LinearAlgebra
 
+include("Common.jl")
 include("CSRGraph.jl")
 include("Dijkstra.jl")
 include("DMMSY-SSSP.jl")
 include("DMMSY_Research.jl")
 
+using .Common
 using .CSRGraphModule
 using .DijkstraModule
 using .DMMSYSSSP
 using .DMMSYResearch
 using Printf
+include("test_sssp.jl")
 
 function run_report_benchmark()
     # Configuration: (n, m, trials)
@@ -38,13 +42,12 @@ function run_report_benchmark()
 
     println("DMMSY Synchronized Performance Reporter (v5.6)")
 
-    # Correctness checks
-    if !DMMSYSSSP.verify_correctness()
-        println("Optimized Correctness check FAILED. Aborting.")
-        return
-    end
-    if !DMMSYResearch.verify_research_correctness()
-        println("Research Correctness check FAILED. Aborting.")
+    # Correctness checks via external test suite
+    try
+        run_comprehensive_tests()
+        println("All correctness checks PASSED.")
+    catch e
+        println("Correctness check FAILED: $e. Aborting.")
         return
     end
 

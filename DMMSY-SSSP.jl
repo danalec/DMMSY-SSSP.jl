@@ -11,22 +11,25 @@ using ..DijkstraModule: dijkstra_ref
 export ssp_duan, verify_correctness
 
 # ----------------------------------------------------------------------------
-# Optimized 4-Ary Heap with cleaner implementation
+# Optimized 4-Ary Heap with dirty-tracking
 # ----------------------------------------------------------------------------
 struct Fast4AryHeap{T<:Integer, W<:Real}
     vals::Vector{W}
     idxs::Vector{T}
     pos::Vector{T}
+    dirty::Vector{T}
 end
 
-@inline function push_dec!(h::Fast4AryHeap{T,W}, sz::Int, n::T, d::W) where {T,W}
+@inline function push_dec!(h::Fast4AryHeap{T,W}, sz::Int, dcnt::Int, n::T, d::W) where {T,W}
     @inbounds p = h.pos[Int(n)]
-    if p == 0
+    if p == 0 || p == typemax(T)
         sz += 1
+        dcnt += 1
         i = sz
+        @inbounds h.dirty[dcnt] = n
     else
         i = Int(p)
-        @inbounds if d >= h.vals[i]; return sz end
+        @inbounds if d >= h.vals[i]; return sz, dcnt end
     end
     while i > 1
         par = (i - 2) >>> 2 + 1
@@ -41,19 +44,19 @@ end
     @inbounds h.vals[i] = d
     @inbounds h.idxs[i] = n
     @inbounds h.pos[Int(n)] = i
-    return sz
+    return sz, dcnt
 end
 
 @inline function pop_min!(h::Fast4AryHeap{T,W}, sz::Int) where {T,W}
     @inbounds mv, mn = h.vals[1], h.idxs[1]
-    @inbounds h.pos[Int(mn)] = typemax(T)
+    @inbounds h.pos[Int(mn)] = typemax(T) 
     if sz == 1; return mv, mn, 0 end
     @inbounds lv, ln = h.vals[sz], h.idxs[sz]
     sz -= 1
     i = 1
     while true
         c1 = (i << 2) - 2
-        c1 > sz && break
+        if c1 > sz; break end
         mc, mcv = c1, h.vals[c1]
         c2 = c1 + 1
         @inbounds if c2 <= sz && h.vals[c2] < mcv; mc, mcv = c2, h.vals[c2] end
@@ -61,7 +64,7 @@ end
         @inbounds if c3 <= sz && h.vals[c3] < mcv; mc, mcv = c3, h.vals[c3] end
         c4 = c1 + 3
         @inbounds if c4 <= sz && h.vals[c4] < mcv; mc, mcv = c4, h.vals[c4] end
-        lv <= mcv && break
+        if lv <= mcv; break end
         @inbounds cn = h.idxs[mc]
         @inbounds h.vals[i] = mcv
         @inbounds h.idxs[i] = cn
@@ -92,15 +95,16 @@ mutable struct WorkSpace{T<:Integer, W<:Real}
     h_vals::Vector{W}
     h_idxs::Vector{T}
     h_pos::Vector{T}
+    dirty_h::Vector{T}
+    dh_cnt::Int
     dirty_d::Vector{Int}
     ds_cnt::Int
     piv_buf::Vector{T}
-    active_buf::Vector{T}
 end
 
 function get_workspace(n::Int, ::Type{T}, ::Type{W}) where {T, W}
     tls = task_local_storage()
-    key = (:dmmsy_v520_ws, T, W)
+    key = (:dmmsy_v570_ws, T, W)
     ws = get!(tls, key) do
         WorkSpace{T, W}(
             fill(typemax(W), n),
@@ -108,9 +112,10 @@ function get_workspace(n::Int, ::Type{T}, ::Type{W}) where {T, W}
             Vector{W}(undef, n),
             Vector{T}(undef, n),
             zeros(T, n),
+            zeros(T, n),
+            0,
             zeros(Int, n),
             0,
-            Vector{T}(undef, n),
             Vector{T}(undef, n)
         )
     end::WorkSpace{T, W}
@@ -121,9 +126,10 @@ function get_workspace(n::Int, ::Type{T}, ::Type{W}) where {T, W}
             Vector{W}(undef, n),
             Vector{T}(undef, n),
             zeros(T, n),
+            zeros(T, n),
+            0,
             zeros(Int, n),
             0,
-            Vector{T}(undef, n),
             Vector{T}(undef, n)
         )
         tls[key] = ws
@@ -135,39 +141,52 @@ end
 # Optimized BMSSP Implementation (Algorithm 3)
 # ----------------------------------------------------------------------------
 @inline function bmsp_rec!(g::CSRGraph{T,W}, d::Vector{W}, pr::Vector{T},
-                          src::Vector{T}, B::W, dp::Int, ws::WorkSpace{T,W}) where {T,W}
+                          src_buf::Vector{T}, off_src::Int, len_src::Int,
+                          B::W, dp::Int, ws::WorkSpace{T,W}) where {T,W}
     n = g.n
     k, t = get_params(n)
     off, adj, wts = g.offset, g.adjacency, g.weights
 
-    # Base case: dp >= t or small src (no bound filtering for speed)
-    if dp >= t || length(src) <= k
-        fill!(ws.h_pos, zero(T))
-        h = Fast4AryHeap{T, W}(ws.h_vals, ws.h_idxs, ws.h_pos)
-        sz = 0
-
-        for s in src
-            sz = push_dec!(h, sz, s, d[Int(s)])
+    # Base case: dp >= t or small src
+    if dp >= t || len_src <= k
+        # Selective reset of heap position map
+        if ws.dh_cnt > 0
+            @inbounds for i in 1:ws.dh_cnt
+                ws.h_pos[Int(ws.dirty_h[i])] = zero(T)
+            end
+            ws.dh_cnt = 0
         end
+        
+        h = Fast4AryHeap{T, W}(ws.h_vals, ws.h_idxs, ws.h_pos, ws.dirty_h)
+        sz, dcnt = 0, 0
+
+        for i in 1:len_src
+            @inbounds s = src_buf[off_src + i]
+            sz, dcnt = push_dec!(h, sz, dcnt, s, d[Int(s)])
+        end
+        ws.dh_cnt = dcnt
 
         while sz > 0
             du, u, sz = pop_min!(h, sz)
             u_i = Int(u)
             @inbounds if du > d[u_i]; continue end
 
-            @inbounds si, ei = off[u_i], off[u_i+1]-1
-            for i in si:ei
+            @inbounds u_off = off[u_i]
+            @inbounds u_end = off[u_i+1] - 1
+            
+            # Relaxation loop
+            @fastmath for i in u_off:u_end
                 @inbounds v, w = adj[i], wts[i]
                 v_i = Int(v)
                 nd = du + w
-                if nd <= d[v_i]
+                @inbounds if nd < d[v_i]
                     if d[v_i] == typemax(W)
                         ws.ds_cnt += 1
                         ws.dirty_d[ws.ds_cnt] = v_i
                     end
-                    d[v_i] = nd
-                    pr[v_i] = u
-                    sz = push_dec!(h, sz, v, nd)
+                    d[v_i], pr[v_i] = nd, u
+                    sz, dcnt = push_dec!(h, sz, ws.dh_cnt, v, nd)
+                    ws.dh_cnt = dcnt
                 end
             end
         end
@@ -175,51 +194,65 @@ end
     end
 
     # Select k pivots evenly from src
-    np = min(length(src), k)
+    np = min(len_src, k)
     pivots = ws.piv_buf
-    step = max(1, length(src) ÷ np)
-    np = 0
-    for i in 1:step:length(src)
-        np += 1
-        pivots[np] = src[i]
-        if np >= k; break end
+    step = max(1, len_src ÷ np)
+    curr_np = 0
+    for i in 1:step:len_src
+        curr_np += 1
+        @inbounds pivots[curr_np] = src_buf[off_src + i]
+        if curr_np >= k; break end
     end
-    pivots = collect(pivots[1:np])
 
-    # Recursive call on pivots with tighter bound
-    bmsp_rec!(g, d, pr, pivots, B * W(0.5), dp + 1, ws)
+    # Recursive call on pivots with tighter bound - zero allocation passing
+    bmsp_rec!(g, d, pr, pivots, 0, curr_np, B * W(0.5), dp + 1, ws)
 
     # Main loop - process remaining src vertices with bound B
-    fill!(ws.h_pos, zero(T))
-    h = Fast4AryHeap{T, W}(ws.h_vals, ws.h_idxs, ws.h_pos)
-    sz = 0
+    # Selective reset of heap position map
+    if ws.dh_cnt > 0
+        @inbounds for i in 1:ws.dh_cnt
+            ws.h_pos[Int(ws.dirty_h[i])] = zero(T)
+        end
+        ws.dh_cnt = 0
+    end
+    
+    h = Fast4AryHeap{T, W}(ws.h_vals, ws.h_idxs, ws.h_pos, ws.dirty_h)
+    sz, dcnt = 0, 0
 
-    for s in src
+    has_work = false
+    @inbounds for i in 1:len_src
+        s = src_buf[off_src + i]
         s_i = Int(s)
-        @inbounds if d[s_i] < B
-            sz = push_dec!(h, sz, s, d[s_i])
+        dv = d[s_i]
+        if dv < B
+            sz, dcnt = push_dec!(h, sz, dcnt, s, dv)
+            has_work = true
         end
     end
+    ws.dh_cnt = dcnt
+
+    if !has_work; return end
 
     while sz > 0
         du, u, sz = pop_min!(h, sz)
         u_i = Int(u)
         @inbounds if du > d[u_i]; continue end
 
-        @inbounds si, ei = off[u_i], off[u_i+1]-1
-        for i in si:ei
+        @inbounds u_off = off[u_i]
+        @inbounds u_end = off[u_i+1] - 1
+        @fastmath for i in u_off:u_end
             @inbounds v, w = adj[i], wts[i]
             v_i = Int(v)
             nd = du + w
-            if nd <= d[v_i]
+            @inbounds if nd < d[v_i]
                 if d[v_i] == typemax(W)
                     ws.ds_cnt += 1
                     ws.dirty_d[ws.ds_cnt] = v_i
                 end
-                d[v_i] = nd
-                pr[v_i] = u
-                @inbounds if nd < B
-                    sz = push_dec!(h, sz, v, nd)
+                d[v_i], pr[v_i] = nd, u
+                if nd < B
+                    sz, dcnt = push_dec!(h, sz, ws.dh_cnt, v, nd)
+                    ws.dh_cnt = dcnt
                 end
             end
         end
@@ -240,22 +273,31 @@ function ssp_duan(g::CSRGraph{T, W}, src::T) where {T, W}
     # Initialize distances - use selective reset
     if ws.ds_cnt > (n >> 2)
         fill!(ws.d, typemax(W))
+        fill!(ws.pr, zero(T))
     else
         @inbounds for i in 1:ws.ds_cnt
-            ws.d[ws.dirty_d[i]] = typemax(W)
+            idx = ws.dirty_d[i]
+            ws.d[idx] = typemax(W)
+            ws.pr[idx] = zero(T)
         end
     end
 
     ws.ds_cnt = 1
     @inbounds ws.d[Int(src)] = zero(W)
     ws.dirty_d[1] = Int(src)
+    
+    ws.dh_cnt = 0 # Ensure heap dirty count is reset
 
-    # Calculate initial bound using log2 and larger multiplier for better performance
-    B = g.mean_weight * log2(n + 1) * W(4.0)
+    # Calculate initial bound
+    log2_n1 = log2(W(n + 1))
+    B = g.mean_weight * log2_n1 * W(4.0)
 
-    # Call BMSSP with active buffer for source
-    ws.active_buf[1] = src
-    bmsp_rec!(g, ws.d, ws.pr, collect(ws.active_buf[1:1]), B, 0, ws)
+    # Call BMSSP with source passed in a temporary single-element buffer
+    # Task local storage can be used for this too, but for one element it's fine.
+    # To be zero-allocation, we can use a pre-allocated field in ws.
+    # Re-purposing piv_buf for the initial call.
+    ws.piv_buf[1] = src
+    bmsp_rec!(g, ws.d, ws.pr, ws.piv_buf, 0, 1, B, 0, ws)
 
     return copy(ws.d), copy(ws.pr)
 end
