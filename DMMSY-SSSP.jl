@@ -99,7 +99,7 @@ mutable struct WorkSpace{T<:Integer, W<:Real}
     dh_cnt::Int
     dirty_d::Vector{Int}
     ds_cnt::Int
-    piv_buf::Vector{T}
+    piv_bufs::Vector{Vector{T}}
 end
 
 function get_workspace(n::Int, ::Type{T}, ::Type{W}) where {T, W}
@@ -116,7 +116,7 @@ function get_workspace(n::Int, ::Type{T}, ::Type{W}) where {T, W}
             0,
             zeros(Int, n),
             0,
-            Vector{T}(undef, n)
+            [Vector{T}(undef, max(4, Int(floor(log2(n)^(1/3))))) for _ in 1:max(2, Int(floor(log2(n)^(2/3)))) + 1]
         )
     end::WorkSpace{T, W}
     if length(ws.d) != n
@@ -130,7 +130,7 @@ function get_workspace(n::Int, ::Type{T}, ::Type{W}) where {T, W}
             0,
             zeros(Int, n),
             0,
-            Vector{T}(undef, n)
+            [Vector{T}(undef, max(4, Int(floor(log2(n)^(1/3))))) for _ in 1:max(2, Int(floor(log2(n)^(2/3)))) + 1]
         )
         tls[key] = ws
     end
@@ -195,13 +195,13 @@ end
 
     # Select k pivots evenly from src
     np = min(len_src, k)
-    pivots = ws.piv_buf
+    pivots = ws.piv_bufs[dp + 2]
     step = max(1, len_src ÷ np)
     curr_np = 0
-    for i in 1:step:len_src
+    bound = min(len_src, step * k)
+    for i in 1:step:bound
         curr_np += 1
         @inbounds pivots[curr_np] = src_buf[off_src + i]
-        if curr_np >= k; break end
     end
 
     # Recursive call on pivots with tighter bound - zero allocation passing
@@ -295,9 +295,9 @@ function ssp_duan(g::CSRGraph{T, W}, src::T) where {T, W}
     # Call BMSSP with source passed in a temporary single-element buffer
     # Task local storage can be used for this too, but for one element it's fine.
     # To be zero-allocation, we can use a pre-allocated field in ws.
-    # Re-purposing piv_buf for the initial call.
-    ws.piv_buf[1] = src
-    bmsp_rec!(g, ws.d, ws.pr, ws.piv_buf, 0, 1, B, 0, ws)
+    # Re-purposing piv_bufs[1] for the initial call.
+    ws.piv_bufs[1][1] = src
+    bmsp_rec!(g, ws.d, ws.pr, ws.piv_bufs[1], 0, 1, B, 0, ws)
 
     return copy(ws.d), copy(ws.pr)
 end

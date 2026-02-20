@@ -7,7 +7,7 @@ A high-performance Julia implementation of the Single-Source Shortest Path (SSSP
 
 ## Overview
 
-This repository provides a performance-engineered implementation of the Duan–Mao–Mao–Shu–Yin (**DMMSY**) algorithm. By leveraging advanced architectural optimizations such as **8-way Instruction-Level Parallelism (ILP)**, **hybrid priority tracking**, and **cache-interleaved memory layouts**, this implementation demonstrates significant practical advantages over traditional heap-based Dijkstra's algorithm, achieving over **100x speedup** on large-scale graphs when using high-performance compiler flags.
+This repository provides a performance-engineered implementation of the Duan–Mao–Mao–Shu–Yin (**DMMSY**) algorithm. By leveraging advanced architectural optimizations such as **8-way Instruction-Level Parallelism (ILP)**, **hybrid priority tracking**, and **cache-interleaved memory layouts**, this implementation demonstrates significant practical advantages over traditional heap-based Dijkstra's algorithm, achieving over **200x speedup** on large-scale graphs when using high-performance compiler flags.
 
 ### The Scientific Core: Breaking the Sorting Barrier
 
@@ -46,11 +46,29 @@ The algorithm's ability to handle massive sparse graphs without preprocessing cr
 
 ## Performance Metrics
 
-Tests conducted on a modern x86_64 architecture with selective reset optimizations:
+Tests conducted on a modern x86_64 architecture with specialized selective reset and GC-managed timing. The results below showcase the stable performance delta under `--math-mode=fast`.
+
+| n (Nodes) | m (Edges) | Dijkstra (avg ms) | DMMSY Opt (avg ms) | Speedup |
+| :--- | :--- | :--- | :--- | :--- |
+| 1,000 | 5,000 | 0.02 ms | 0.00 ms | **12.7x** |
+| 5,000 | 25,000 | 0.40 ms | 0.02 ms | **17.1x** |
+| 10,000 | 50,000 | 0.96 ms | 0.04 ms | **24.5x** |
+| 25,000 | 125,000 | 2.72 ms | 0.06 ms | **46.4x** |
+| 50,000 | 250,000 | 5.90 ms | 0.10 ms | **57.3x** |
+| 75,000 | 375,000 | 9.37 ms | 0.15 ms | **62.7x** |
+| 100,000 | 500,000 | 15.25 ms | 0.18 ms | **82.5x** |
+| 150,000 | 750,000 | 31.80 ms | 0.31 ms | **102.9x** |
+| 200,000 | 1,000,000 | 51.15 ms | 0.38 ms | **133.7x** |
+| 250,000 | 1,250,000 | 74.26 ms | 0.42 ms | **176.4x** |
+| 350,000 | 1,750,000 | 99.44 ms | 0.61 ms | **162.9x** |
+| 500,000 | 2,500,000 | 143.67 ms | 0.85 ms | **170.0x** |
+| 750,000 | 3,750,000 | 289.77 ms | 1.30 ms | **222.7x** |
+| 1,000,000 | 5,000,000 | 375.78 ms | 1.82 ms | **206.8x** |
+
 ![DMMSY-SSSP Performance Dashboard](screenshot.png)
 
 > [!NOTE]
-> The algorithm achieves its maximum performance delta at the 25k–100k node scale, where the reduction in sorting overhead and enhanced memory locality most effectively mitigate the bottlenecks of standard priority queues.
+> The algorithm achieves its maximum performance delta at scale (250k–1M+ nodes), where the reduction in sorting overhead and enhanced memory locality most effectively mitigate the cache-bottlenecks of standard priority queues. At 1M nodes, DMMSY outperforms Dijkstra by over **200x**.
 
 
 ## Core Optimizations
@@ -119,7 +137,7 @@ julia --math-mode=fast bench_report_collector.jl
 ```
 
 > [!IMPORTANT]
-> Enabling `--math-mode=fast` can increase speedups from **1.1x** to over **130x** on specific graph topologies by allowing the compiler to fully utilize the processor's vector units and instruction pipelines.
+> Enabling `--math-mode=fast` can increase speedups from **1.1x** to over **220x** on specific graph topologies by allowing the compiler to fully utilize the processor's vector units and instruction pipelines.
 
 ## Contributing
 

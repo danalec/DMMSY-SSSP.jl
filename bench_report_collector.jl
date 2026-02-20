@@ -72,9 +72,20 @@ function run_report_benchmark()
             end
 
             # Execution for all implementations with consistent trials
+            GC.gc()
+            GC.enable(false)
             t_dij = @elapsed for _ in 1:trials DijkstraModule.dijkstra_ref(g, source) end
+            GC.enable(true)
+
+            GC.gc()
+            GC.enable(false)
             t_opt = @elapsed for _ in 1:trials DMMSYSSSP.ssp_duan(g, source) end
+            GC.enable(true)
+
+            GC.gc()
+            GC.enable(false)
             t_res = @elapsed for _ in 1:trials DMMSYResearch.ssp_duan_research(g, source) end
+            GC.enable(true)
 
             avg_dij = (t_dij / trials) * 1000
             avg_opt = (t_opt / trials) * 1000
