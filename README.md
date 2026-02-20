@@ -9,6 +9,21 @@ A high-performance Julia implementation of the Single-Source Shortest Path (SSSP
 
 This repository provides a performance-engineered implementation of the Duan–Mao–Mao–Shu–Yin (**DMMSY**) algorithm. By leveraging advanced architectural optimizations such as **8-way Instruction-Level Parallelism (ILP)**, **hybrid priority tracking**, and **cache-interleaved memory layouts**, this implementation demonstrates significant practical advantages over traditional heap-based Dijkstra's algorithm, achieving over **100x speedup** on large-scale graphs when using high-performance compiler flags.
 
+### The Scientific Core: Breaking the Sorting Barrier
+
+The DMMSY algorithm represents the first deterministic breakthrough to exceed the $O(m + n \log n)$ complexity barrier that has stood for 65 years since Dijkstra's original proposal. 
+
+- **Complexity Shift**: It reduces the logarithmic factor from $O(\log n)$ to $O(\log^{2/3} n)$. For a graph with $10^9$ nodes, this is a ~3x reduction in sorting overhead.
+- **Interval-Pivot Mechanism**: Unlike Dijkstra which sorts nodes individually, DMMSY uses a recursive subproblem decomposition based on interval pivots. This allows it to relax edges without maintaining a strict global priority queue for every extraction.
+
+### DMMSY vs. Preprocessing (Dynamic Graphs)
+
+Traditional production engines often use **Contraction Hierarchies (CH)** or **A*** to achieve sub-millisecond queries. However, these rely on expensive preprocessing ($O(n \log n)$ to $O(n^2)$) that must be rebuilt whenever edge weights change.
+
+**DMMSY is the superior choice for Dynamic Graphs** where:
+1. **Topology/Weights Change Rapidly**: The costs of rebuilding a hierarchy (20-40 minutes for road networks) cannot be amortized.
+2. **Zero Preprocessing luxury**: Real-time systems like **Financial Market Arbitrage** or **Software-Defined Networking (SDN)** require immediate SSSP computation on a raw, mutating graph.
+
 ## Key Features
 
 - **Theoretical Breakthrough**: Implements the first deterministic algorithm to break the $O(m \log n)$ sorting barrier for directed graphs, achieving $O(m \log^{2/3} n)$ complexity.
@@ -16,6 +31,18 @@ This repository provides a performance-engineered implementation of the Duan–M
 - **Selective Memory Reset**: Utilizes dirty-index tracking to eliminate $O(n)$ overhead during recursive subproblem resets.
 - **Adaptive Strategy**: Employs a hybrid tracking system (Bitmap + Heap) and dynamic threshold feedback to maintain peak efficiency.
 - **Robust Verification**: Validated against reference Dijkstra implementations across linear, diamond, cycle, and hub topologies.
+
+## Industrial Impact
+
+The algorithm's ability to handle massive sparse graphs without preprocessing creates a new paradigm for specific industrial domains:
+
+| Sector | Application | DMMSY Advantage |
+| :--- | :--- | :--- |
+| **Finance** | Arbitrage Detection | Faster negative-cycle detection in violently dynamic FX/Crypto markets. |
+| **Networking** | SDN & OSPF | Reduced path convergence time in datacenter fabrics during link failures. |
+| **Logistics** | Live Traffic Routing | Faster fallback SSSP when emergency closures invalidate precomputed hierarchies. |
+| **EDA** | Chip Design | Iterative timing analysis on circuit DAGs with millions of gate nodes. |
+| **Social Tech** | Influence Analysis | Real-time recommendation ranking on billion-node sparse social graphs. |
 
 ## Performance Metrics
 
