@@ -48,7 +48,6 @@ The algorithm's ability to handle massive sparse graphs without preprocessing cr
 
 Tests conducted on a modern x86_64 architecture with specialized selective reset and GC-managed timing. The results below showcase the stable performance delta under `--math-mode=fast`.
 
-
 ![DMMSY-SSSP Performance Dashboard](screenshot.png)
 
 > [!NOTE]
