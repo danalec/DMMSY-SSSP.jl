@@ -5,7 +5,8 @@ bench_report_collector.jl — High-Precision Performance Data Gatherer & Reporte
 Syncs results to CSV and auto-integrates into benchmark_results.html.
 """
 
-using LinearAlgebra
+using Random
+Random.seed!(1234)
 
 include("Common.jl")
 include("CSRGraph.jl")
@@ -52,13 +53,13 @@ function run_report_benchmark()
     end
 
     println("===========================================================================")
-    @printf("%-10s %-10s %-12s %-12s %-12s %-8s\n", "n", "m", "Dijkstra", "DMMSY Opt", "DMMSY Res", "Spd(Opt)")
+    @printf("%-10s %-10s %-12s %-12s %-12s %-8s\n", "n", "m", "Dijkstra", "DMMSY Res", "DMMSY Opt", "Spd(Opt)")
     println("---------------------------------------------------------------------------")
 
     output_file = "benchmark_data.csv"
 
     open(output_file, "w") do f
-        println(f, "n,m,dijkstra,dmmsy_opt,dmmsy_res")
+        println(f, "n,m,dijkstra,dmmsy_res,dmmsy_opt")
 
         for (n, m, trials) in test_cases
             g = random_graph(n, m, 100.0)
@@ -77,6 +78,8 @@ function run_report_benchmark()
             t_dij = @elapsed for _ in 1:trials DijkstraModule.dijkstra_ref(g, source) end
             GC.enable(true)
 
+
+
             GC.gc()
             GC.enable(false)
             t_opt = @elapsed for _ in 1:trials DMMSYSSSP.ssp_duan(g, source) end
@@ -92,28 +95,26 @@ function run_report_benchmark()
             avg_res = (t_res / trials) * 1000
             spd = avg_dij / avg_opt
 
-            @printf("%-10d %-10d %-12.4f %-12.4f %-12.4f %-8.2fx\n", n, m, avg_dij, avg_opt, avg_res, spd)
-            @printf(f, "%d,%d,%.6f,%.6f,%.6f\n", n, m, avg_dij, avg_opt, avg_res)
+            @printf("%-10d %-10d %-12.4f %-12.4f %-12.4f %-8.2fx\n", n, m, avg_dij, avg_res, avg_opt, spd)
+            @printf(f, "%d,%d,%.6f,%.6f,%.6f\n", n, m, avg_dij, avg_res, avg_opt)
         end
     end
 
     println("===========================================================================")
     println("Full benchmark complete. Results saved to $output_file")
 
-    # Auto-embed into HTML for visualization
+    # Write JS file so HTML can load the data without a local server (CORS workaround)
     try
         csv_data = read(output_file, String)
-        html_path = "benchmark_results.html"
-        if isfile(html_path)
-            html_content = read(html_path, String)
-            new_data_js = "const EMBEDDED_DATA = `$(csv_data)`;"
-            updated_html = replace(html_content, r"const EMBEDDED_DATA = `[\s\S]*?`;" => new_data_js)
-            write(html_path, updated_html)
-            println("Updated $html_path with latest data.")
+        open("benchmark_data.js", "w") do f
+            write(f, "const BENCHMARK_CSV_DATA = \`\n$(csv_data)\`;\n")
         end
+        println("Exported JavaScript data binding to benchmark_data.js")
     catch e
-        println("Note: Could not auto-update HTML: $e")
+        println("Note: Could not create JS data file: $e")
     end
+
+    println("Data is written. You can now open `benchmark_results.html` directly in your browser without a local server.")
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__

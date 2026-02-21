@@ -1,67 +1,97 @@
 
 module Common
-export Fast4AryHeap, push_dec!, pop_min!
+export Fast4AryHeap, push_dec!, pop_min!, Edge, get_params, HeapNode
+
+# ----------------------------------------------------------------------------
+# Interleaved Edge structure for better cache locality
+# ----------------------------------------------------------------------------
+struct Edge{T<:Integer, W<:Real}
+    v::T
+    w::W
+end
+
+# ----------------------------------------------------------------------------
+# Shared algorithm parameters
+# ----------------------------------------------------------------------------
+@inline function get_params(n::Integer)
+    k = max(4, Int(floor(log2(n)^(1/3))))
+    t = max(2, Int(floor(log2(n)^(2/3))))
+    return k, t
+end
 
 # ----------------------------------------------------------------------------
 # Optimized 4-Ary Heap used across multiple SSSP implementations
 # ----------------------------------------------------------------------------
-struct Fast4AryHeap{T<:Integer, W<:Real}
-    vals::Vector{W}
-    idxs::Vector{T}
-    pos::Vector{T}
+struct HeapNode{T<:Integer, W<:Real}
+    v::W
+    i::T
 end
 
-@inline function push_dec!(h::Fast4AryHeap{T,W}, sz::Int, n::T, d::W) where {T,W}
+struct Fast4AryHeap{T<:Integer, W<:Real}
+    nodes::Vector{HeapNode{T, W}}
+    pos::Vector{T}
+    dirty::Vector{T}
+end
+
+@inline function push_dec!(h::Fast4AryHeap{T,W}, sz::Int, dcnt::Int, n::T, d::W) where {T,W}
     @inbounds p = h.pos[Int(n)]
-    if p == 0
+    if p == 0 || p == typemax(T)
         sz += 1
+        dcnt += 1
         i = sz
+        @inbounds h.dirty[dcnt] = n
     else
         i = Int(p)
-        @inbounds if d >= h.vals[i]; return sz end
+        @inbounds if d >= h.nodes[i].v; return sz, dcnt end
     end
     while i > 1
         par = (i - 2) >>> 2 + 1
-        @inbounds pv = h.vals[par]
-        pv <= d && break
-        @inbounds pn = h.idxs[par]
-        @inbounds h.vals[i] = pv
-        @inbounds h.idxs[i] = pn
-        @inbounds h.pos[Int(pn)] = i
+        @inbounds node = h.nodes[par]
+        node.v <= d && break
+        @inbounds h.nodes[i] = node
+        @inbounds h.pos[Int(node.i)] = i
         i = par
     end
-    @inbounds h.vals[i] = d
-    @inbounds h.idxs[i] = n
+    @inbounds h.nodes[i] = HeapNode{T, W}(d, n)
     @inbounds h.pos[Int(n)] = i
-    return sz
+    return sz, dcnt
 end
 
 @inline function pop_min!(h::Fast4AryHeap{T,W}, sz::Int) where {T,W}
-    @inbounds mv, mn = h.vals[1], h.idxs[1]
+    @inbounds mn_node = h.nodes[1]
+    mv, mn = mn_node.v, mn_node.i
     @inbounds h.pos[Int(mn)] = typemax(T)
     if sz == 1; return mv, mn, 0 end
-    @inbounds lv, ln = h.vals[sz], h.idxs[sz]
+    @inbounds last_node = h.nodes[sz]
+    lv, ln = last_node.v, last_node.i
     sz -= 1
     i = 1
     while true
         c1 = (i << 2) - 2
         c1 > sz && break
-        mc, mcv = c1, h.vals[c1]
-        c2 = c1 + 1
-        @inbounds if c2 <= sz && h.vals[c2] < mcv; mc, mcv = c2, h.vals[c2] end
-        c3 = c1 + 2
-        @inbounds if c3 <= sz && h.vals[c3] < mcv; mc, mcv = c3, h.vals[c3] end
-        c4 = c1 + 3
-        @inbounds if c4 <= sz && h.vals[c4] < mcv; mc, mcv = c4, h.vals[c4] end
+        @inbounds mc_node = h.nodes[c1]
+        mc, mcv = c1, mc_node.v
+        
+        @inbounds if c1 + 1 <= sz
+            c2_node = h.nodes[c1 + 1]
+            if c2_node.v < mcv; mc, mcv, mc_node = c1 + 1, c2_node.v, c2_node end
+        end
+        @inbounds if c1 + 2 <= sz
+            c3_node = h.nodes[c1 + 2]
+            if c3_node.v < mcv; mc, mcv, mc_node = c1 + 2, c3_node.v, c3_node end
+        end
+        @inbounds if c1 + 3 <= sz
+            c4_node = h.nodes[c1 + 3]
+            if c4_node.v < mcv; mc, mcv, mc_node = c1 + 3, c4_node.v, c4_node end
+        end
+        
         lv <= mcv && break
-        @inbounds cn = h.idxs[mc]
-        @inbounds h.vals[i] = mcv
-        @inbounds h.idxs[i] = cn
-        @inbounds h.pos[Int(cn)] = i
+        
+        @inbounds h.nodes[i] = mc_node
+        @inbounds h.pos[Int(mc_node.i)] = i
         i = mc
     end
-    @inbounds h.vals[i] = lv
-    @inbounds h.idxs[i] = ln
+    @inbounds h.nodes[i] = last_node
     @inbounds h.pos[Int(ln)] = i
     return mv, mn, sz
 end

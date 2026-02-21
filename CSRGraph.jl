@@ -1,17 +1,20 @@
 module CSRGraphModule
 
+using ..Common: Edge
+
 export CSRGraph, random_graph, reconstruct_path
 
 struct CSRGraph{T<:Integer, W<:Real}
     n::T; m::T
-    offset::Vector{T}; adjacency::Vector{T}; weights::Vector{W}
+    offset::Vector{T}
+    edges::Vector{Edge{T, W}}
     mean_weight::W
 end
 
-function CSRGraph{T, W}(n::Int, edges::Vector{Tuple{Int, Int, W}}) where {T<:Integer, W<:Real}
+function CSRGraph{T, W}(n::Int, edges_in::Vector{Tuple{Int, Int, W}}) where {T<:Integer, W<:Real}
     # Count edges per source vertex to determine offsets
     counts = zeros(Int, n)
-    for (u, v, w) in edges
+    for (u, v, w) in edges_in
         if 1 <= u <= n && 1 <= v <= n && w >= 0
             counts[u] += 1
         end
@@ -19,8 +22,7 @@ function CSRGraph{T, W}(n::Int, edges::Vector{Tuple{Int, Int, W}}) where {T<:Int
     
     m = sum(counts)
     off = Vector{T}(undef, n + 1)
-    adj = Vector{T}(undef, m)
-    wts = Vector{W}(undef, m)
+    e_out = Vector{Edge{T, W}}(undef, m)
     
     # Prefix sum to compute offsets
     off[1] = 1
@@ -30,17 +32,21 @@ function CSRGraph{T, W}(n::Int, edges::Vector{Tuple{Int, Int, W}}) where {T<:Int
     
     # Reuse counts as current index pointers
     fill!(counts, 0)
-    for (u, v, w) in edges
+    for (u, v, w) in edges_in
         if 1 <= u <= n && 1 <= v <= n && w >= 0
             idx = off[u] + counts[u]
-            adj[idx] = T(v)
-            wts[idx] = w
+            e_out[idx] = Edge{T, W}(T(v), w)
             counts[u] += 1
         end
     end
     
-    mw = m > 0 ? sum(wts) / m : zero(W)
-    return CSRGraph{T, W}(T(n), T(m), off, adj, wts, mw)
+    sum_w = zero(W)
+    for i in 1:m
+        @inbounds sum_w += e_out[i].w
+    end
+    mw = m > 0 ? sum_w / m : zero(W)
+    
+    return CSRGraph{T, W}(T(n), T(m), off, e_out, mw)
 end
 
 CSRGraph(n::Int, edges::Vector{Tuple{Int, Int, W}}) where W = CSRGraph{Int, W}(n, edges)

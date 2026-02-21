@@ -48,22 +48,6 @@ The algorithm's ability to handle massive sparse graphs without preprocessing cr
 
 Tests conducted on a modern x86_64 architecture with specialized selective reset and GC-managed timing. The results below showcase the stable performance delta under `--math-mode=fast`.
 
-| n (Nodes) | m (Edges) | Dijkstra (avg ms) | DMMSY Opt (avg ms) | Speedup |
-| :--- | :--- | :--- | :--- | :--- |
-| 1,000 | 5,000 | 0.02 ms | 0.00 ms | **12.7x** |
-| 5,000 | 25,000 | 0.40 ms | 0.02 ms | **17.1x** |
-| 10,000 | 50,000 | 0.96 ms | 0.04 ms | **24.5x** |
-| 25,000 | 125,000 | 2.72 ms | 0.06 ms | **46.4x** |
-| 50,000 | 250,000 | 5.90 ms | 0.10 ms | **57.3x** |
-| 75,000 | 375,000 | 9.37 ms | 0.15 ms | **62.7x** |
-| 100,000 | 500,000 | 15.25 ms | 0.18 ms | **82.5x** |
-| 150,000 | 750,000 | 31.80 ms | 0.31 ms | **102.9x** |
-| 200,000 | 1,000,000 | 51.15 ms | 0.38 ms | **133.7x** |
-| 250,000 | 1,250,000 | 74.26 ms | 0.42 ms | **176.4x** |
-| 350,000 | 1,750,000 | 99.44 ms | 0.61 ms | **162.9x** |
-| 500,000 | 2,500,000 | 143.67 ms | 0.85 ms | **170.0x** |
-| 750,000 | 3,750,000 | 289.77 ms | 1.30 ms | **222.7x** |
-| 1,000,000 | 5,000,000 | 375.78 ms | 1.82 ms | **206.8x** |
 
 ![DMMSY-SSSP Performance Dashboard](screenshot.png)
 
@@ -73,7 +57,9 @@ Tests conducted on a modern x86_64 architecture with specialized selective reset
 
 ## Core Optimizations
 
-1. **Interleaved Memory Layout**: Distances and block-level metadata are co-located to ensure single-cache-line access during state updates.
+1. **Dual-Level Interleaving**: 
+   - **Graph Layer**: Neighbor IDs and weights are co-located in an `Edge` struct to ensure single-cache-line fetches during relaxation.
+   - **Heap Layer**: Distance values and node IDs are co-located in a `HeapNode` struct within the 4-ary heap, minimizing cache thrashing during swaps.
 2. **8-way ILP Unrolling**: Critical relaxation loops are manually unrolled to saturate execution units and remove data dependency chains.
 3. **Hybrid Block Search**: Swaps between $O(1)$ bitmap scanning and $O(\log n)$ heap-based selection based on subproblem characteristics.
 4. **Adaptive Thresholding**: Dynamically adjusts recursive propagation thresholds based on real-time extraction efficiency.

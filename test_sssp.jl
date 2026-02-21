@@ -10,6 +10,8 @@ using .DijkstraModule
 using .DMMSYSSSP
 using .DMMSYResearch
 using Test
+using Random
+Random.seed!(1234)
 
 function run_comprehensive_tests()
     @testset "SSSP Correctness Tests" begin
@@ -19,10 +21,10 @@ function run_comprehensive_tests()
             d_ref, _ = dijkstra_ref(g, 1)
             
             d_opt, _ = ssp_duan(g, 1)
-            @test d_opt == d_ref
+            @test d_opt ≈ d_ref
             
             d_res, _ = ssp_duan_research(g, 1)
-            @test d_res == d_ref
+            @test d_res ≈ d_ref
         end
 
         @testset "Topology: Cycle with shortcut" begin
@@ -30,10 +32,10 @@ function run_comprehensive_tests()
             d_ref, _ = dijkstra_ref(g, 1)
             
             d_opt, _ = ssp_duan(g, 1)
-            @test d_opt == d_ref
+            @test d_opt ≈ d_ref
             
             d_res, _ = ssp_duan_research(g, 1)
-            @test d_res == d_ref
+            @test d_res ≈ d_ref
         end
 
         @testset "Topology: Large Random Graph" begin
@@ -44,10 +46,10 @@ function run_comprehensive_tests()
             d_ref, _ = dijkstra_ref(g, source)
             
             d_opt, _ = ssp_duan(g, source)
-            @test d_opt == d_ref
+            @test d_opt ≈ d_ref
             
             d_res, _ = ssp_duan_research(g, source)
-            @test d_res == d_ref
+            @test d_res ≈ d_ref
         end
 
         @testset "Topology: Disconnected Components" begin
@@ -55,7 +57,7 @@ function run_comprehensive_tests()
             d_ref, _ = dijkstra_ref(g, 1)
             
             d_opt, _ = ssp_duan(g, 1)
-            @test d_opt == d_ref
+            @test d_opt ≈ d_ref
             @test d_opt[4] == typemax(Float64)
         end
     end

@@ -7,84 +7,9 @@ module DMMSYSSSP
 
 using ..CSRGraphModule: CSRGraph
 using ..DijkstraModule: dijkstra_ref
+using ..Common: get_params, Edge, HeapNode, push_dec!, pop_min!, Fast4AryHeap
 
 export ssp_duan, verify_correctness
-
-# ----------------------------------------------------------------------------
-# Optimized 4-Ary Heap with dirty-tracking
-# ----------------------------------------------------------------------------
-struct Fast4AryHeap{T<:Integer, W<:Real}
-    vals::Vector{W}
-    idxs::Vector{T}
-    pos::Vector{T}
-    dirty::Vector{T}
-end
-
-@inline function push_dec!(h::Fast4AryHeap{T,W}, sz::Int, dcnt::Int, n::T, d::W) where {T,W}
-    @inbounds p = h.pos[Int(n)]
-    if p == 0 || p == typemax(T)
-        sz += 1
-        dcnt += 1
-        i = sz
-        @inbounds h.dirty[dcnt] = n
-    else
-        i = Int(p)
-        @inbounds if d >= h.vals[i]; return sz, dcnt end
-    end
-    while i > 1
-        par = (i - 2) >>> 2 + 1
-        @inbounds pv = h.vals[par]
-        pv <= d && break
-        @inbounds pn = h.idxs[par]
-        @inbounds h.vals[i] = pv
-        @inbounds h.idxs[i] = pn
-        @inbounds h.pos[Int(pn)] = i
-        i = par
-    end
-    @inbounds h.vals[i] = d
-    @inbounds h.idxs[i] = n
-    @inbounds h.pos[Int(n)] = i
-    return sz, dcnt
-end
-
-@inline function pop_min!(h::Fast4AryHeap{T,W}, sz::Int) where {T,W}
-    @inbounds mv, mn = h.vals[1], h.idxs[1]
-    @inbounds h.pos[Int(mn)] = typemax(T) 
-    if sz == 1; return mv, mn, 0 end
-    @inbounds lv, ln = h.vals[sz], h.idxs[sz]
-    sz -= 1
-    i = 1
-    while true
-        c1 = (i << 2) - 2
-        if c1 > sz; break end
-        mc, mcv = c1, h.vals[c1]
-        c2 = c1 + 1
-        @inbounds if c2 <= sz && h.vals[c2] < mcv; mc, mcv = c2, h.vals[c2] end
-        c3 = c1 + 2
-        @inbounds if c3 <= sz && h.vals[c3] < mcv; mc, mcv = c3, h.vals[c3] end
-        c4 = c1 + 3
-        @inbounds if c4 <= sz && h.vals[c4] < mcv; mc, mcv = c4, h.vals[c4] end
-        if lv <= mcv; break end
-        @inbounds cn = h.idxs[mc]
-        @inbounds h.vals[i] = mcv
-        @inbounds h.idxs[i] = cn
-        @inbounds h.pos[Int(cn)] = i
-        i = mc
-    end
-    @inbounds h.vals[i] = lv
-    @inbounds h.idxs[i] = ln
-    @inbounds h.pos[Int(ln)] = i
-    return mv, mn, sz
-end
-
-# ----------------------------------------------------------------------------
-# Simplified Algorithm Parameters (using log2 for efficiency)
-# ----------------------------------------------------------------------------
-@inline function get_params(n::Int)
-    k = max(4, Int(floor(log2(n)^(1/3))))
-    t = max(2, Int(floor(log2(n)^(2/3))))
-    return k, t
-end
 
 # ----------------------------------------------------------------------------
 # Optimized Workspace with pre-allocated buffers
@@ -92,8 +17,7 @@ end
 mutable struct WorkSpace{T<:Integer, W<:Real}
     d::Vector{W}
     pr::Vector{T}
-    h_vals::Vector{W}
-    h_idxs::Vector{T}
+    h_nodes::Vector{HeapNode{T, W}}
     h_pos::Vector{T}
     dirty_h::Vector{T}
     dh_cnt::Int
@@ -109,8 +33,7 @@ function get_workspace(n::Int, ::Type{T}, ::Type{W}) where {T, W}
         WorkSpace{T, W}(
             fill(typemax(W), n),
             zeros(T, n),
-            Vector{W}(undef, n),
-            Vector{T}(undef, n),
+            Vector{HeapNode{T, W}}(undef, n),
             zeros(T, n),
             zeros(T, n),
             0,
@@ -123,8 +46,7 @@ function get_workspace(n::Int, ::Type{T}, ::Type{W}) where {T, W}
         ws = WorkSpace{T, W}(
             fill(typemax(W), n),
             zeros(T, n),
-            Vector{W}(undef, n),
-            Vector{T}(undef, n),
+            Vector{HeapNode{T, W}}(undef, n),
             zeros(T, n),
             zeros(T, n),
             0,
@@ -145,7 +67,7 @@ end
                           B::W, dp::Int, ws::WorkSpace{T,W}) where {T,W}
     n = g.n
     k, t = get_params(n)
-    off, adj, wts = g.offset, g.adjacency, g.weights
+    off, edges = g.offset, g.edges
 
     # Base case: dp >= t or small src
     if dp >= t || len_src <= k
@@ -157,7 +79,7 @@ end
             ws.dh_cnt = 0
         end
         
-        h = Fast4AryHeap{T, W}(ws.h_vals, ws.h_idxs, ws.h_pos, ws.dirty_h)
+        h = Fast4AryHeap{T, W}(ws.h_nodes, ws.h_pos, ws.dirty_h)
         sz, dcnt = 0, 0
 
         for i in 1:len_src
@@ -176,7 +98,8 @@ end
             
             # Relaxation loop
             @fastmath for i in u_off:u_end
-                @inbounds v, w = adj[i], wts[i]
+                @inbounds e = edges[i]
+                @inbounds v, w = e.v, e.w
                 v_i = Int(v)
                 nd = du + w
                 @inbounds if nd < d[v_i]
@@ -216,7 +139,7 @@ end
         ws.dh_cnt = 0
     end
     
-    h = Fast4AryHeap{T, W}(ws.h_vals, ws.h_idxs, ws.h_pos, ws.dirty_h)
+    h = Fast4AryHeap{T, W}(ws.h_nodes, ws.h_pos, ws.dirty_h)
     sz, dcnt = 0, 0
 
     has_work = false
@@ -241,7 +164,8 @@ end
         @inbounds u_off = off[u_i]
         @inbounds u_end = off[u_i+1] - 1
         @fastmath for i in u_off:u_end
-            @inbounds v, w = adj[i], wts[i]
+            @inbounds e = edges[i]
+            @inbounds v, w = e.v, e.w
             v_i = Int(v)
             nd = du + w
             @inbounds if nd < d[v_i]

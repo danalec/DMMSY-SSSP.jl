@@ -2,18 +2,9 @@ module DMMSYResearch
 
 using ..CSRGraphModule: CSRGraph
 using ..DijkstraModule: dijkstra_ref
-using ..Common
+using ..Common: get_params, Edge, HeapNode, push_dec!, pop_min!, Fast4AryHeap
 
 export ssp_duan_research, verify_research_correctness
-
-# ----------------------------------------------------------------------------
-# Algorithm Parameters (using log2 for efficiency)
-# ----------------------------------------------------------------------------
-function get_params(n::Int)
-    k = max(4, Int(floor(log2(n)^(1/3))))
-    t = max(2, Int(floor(log2(n)^(2/3))))
-    return k, t
-end
 
 # ----------------------------------------------------------------------------
 # Optimized Workspace with pre-allocated buffers
@@ -21,12 +12,12 @@ end
 mutable struct ResearchWorkspace{T, W}
     d::Vector{W}
     pr::Vector{T}
-    h_vals::Vector{W}
-    h_idxs::Vector{T}
+    h_nodes::Vector{HeapNode{T, W}}
     h_pos::Vector{T}
+    dirty_h::Vector{T}
     dirty_d::Vector{Int}
     ds_cnt::Int
-    piv_buf::Vector{T}
+    piv_bufs::Vector{Vector{T}}
     active_buf::Vector{T}
 end
 
@@ -37,12 +28,12 @@ function get_research_ws(n::Int, ::Type{T}, ::Type{W}) where {T, W}
         ResearchWorkspace{T, W}(
             fill(typemax(W), n),
             zeros(T, n),
-            Vector{W}(undef, n),
-            Vector{T}(undef, n),
+            Vector{HeapNode{T, W}}(undef, n),
+            zeros(T, n),
             zeros(T, n),
             zeros(Int, n),
             0,
-            Vector{T}(undef, n),
+            [Vector{T}(undef, max(4, Int(floor(log2(n)^(1/3))))) for _ in 1:max(2, Int(floor(log2(n)^(2/3)))) + 1],
             Vector{T}(undef, n)
         )
     end::ResearchWorkspace{T, W}
@@ -50,12 +41,12 @@ function get_research_ws(n::Int, ::Type{T}, ::Type{W}) where {T, W}
         ws = ResearchWorkspace{T, W}(
             fill(typemax(W), n),
             zeros(T, n),
-            Vector{W}(undef, n),
-            Vector{T}(undef, n),
+            Vector{HeapNode{T, W}}(undef, n),
+            zeros(T, n),
             zeros(T, n),
             zeros(Int, n),
             0,
-            Vector{T}(undef, n),
+            [Vector{T}(undef, max(4, Int(floor(log2(n)^(1/3))))) for _ in 1:max(2, Int(floor(log2(n)^(2/3)))) + 1],
             Vector{T}(undef, n)
         )
         tls[key] = ws
@@ -69,16 +60,16 @@ end
 function bmsp!(g::CSRGraph{T, W}, d::Vector{W}, pr::Vector{T}, src::AbstractVector{T}, B::W, dp::Int, ws::ResearchWorkspace{T, W}) where {T, W}
     n = g.n
     k, t = get_params(n)
-    off, adj, wts = g.offset, g.adjacency, g.weights
+    off, edges = g.offset, g.edges
 
     # Base case: dp >= t or small src (no bound filtering for speed)
     if dp >= t || length(src) <= k
         fill!(ws.h_pos, zero(T))
-        h = Fast4AryHeap{T, W}(ws.h_vals, ws.h_idxs, ws.h_pos)
-        sz = 0
+        h = Fast4AryHeap{T, W}(ws.h_nodes, ws.h_pos, ws.dirty_h)
+        sz, dcnt = 0, 0
 
         for s in src
-            sz = push_dec!(h, sz, s, d[Int(s)])
+            sz, dcnt = push_dec!(h, sz, dcnt, s, d[Int(s)])
         end
 
         while sz > 0
@@ -88,7 +79,8 @@ function bmsp!(g::CSRGraph{T, W}, d::Vector{W}, pr::Vector{T}, src::AbstractVect
 
             @inbounds si, ei = off[u_i], off[u_i+1]-1
             for i in si:ei
-                @inbounds v, w = adj[i], wts[i]
+                @inbounds e = edges[i]
+                @inbounds v, w = e.v, e.w
                 v_i = Int(v)
                 nd = du + w
                 if nd <= d[v_i]
@@ -98,7 +90,7 @@ function bmsp!(g::CSRGraph{T, W}, d::Vector{W}, pr::Vector{T}, src::AbstractVect
                     end
                     d[v_i] = nd
                     pr[v_i] = u
-                    sz = push_dec!(h, sz, v, nd)
+                    sz, dcnt = push_dec!(h, sz, dcnt, v, nd)
                 end
             end
         end
@@ -108,29 +100,27 @@ function bmsp!(g::CSRGraph{T, W}, d::Vector{W}, pr::Vector{T}, src::AbstractVect
 
     # Select k pivots evenly from src using pre-allocated buffer (zero allocation!)
     np = min(length(src), k)
-    piv_buf = ws.piv_buf
-    step = max(1, length(src) / np)
+    pivots = ws.piv_bufs[dp + 2]
+    step = max(1, length(src) ÷ np)
     curr_np = 0
-    for i in 1:step:length(src)
-        idx = Int(floor(i))
-        if idx > length(src); break end
+    bound = min(length(src), step * k)
+    for i in 1:step:bound
         curr_np += 1
-        piv_buf[curr_np] = src[idx]
-        if curr_np >= k; break end
+        @inbounds pivots[curr_np] = src[i]
     end
 
     # Recursive call on pivots with tighter bound
-    bmsp!(g, d, pr, view(piv_buf, 1:curr_np), B * W(0.5), dp + 1, ws)
+    bmsp!(g, d, pr, view(pivots, 1:curr_np), B * W(0.5), dp + 1, ws)
 
     # Main loop - process remaining src vertices with bound B
     fill!(ws.h_pos, zero(T))
-    h = Fast4AryHeap{T, W}(ws.h_vals, ws.h_idxs, ws.h_pos)
-    sz = 0
+    h = Fast4AryHeap{T, W}(ws.h_nodes, ws.h_pos, ws.dirty_h)
+    sz, dcnt = 0, 0
 
     for s in src
         s_i = Int(s)
         @inbounds if d[s_i] < B
-            sz = push_dec!(h, sz, s, d[s_i])
+            sz, dcnt = push_dec!(h, sz, dcnt, s, d[s_i])
         end
     end
 
@@ -141,7 +131,8 @@ function bmsp!(g::CSRGraph{T, W}, d::Vector{W}, pr::Vector{T}, src::AbstractVect
 
         @inbounds si, ei = off[u_i], off[u_i+1]-1
         for i in si:ei
-            @inbounds v, w = adj[i], wts[i]
+            @inbounds e = edges[i]
+            @inbounds v, w = e.v, e.w
             v_i = Int(v)
             nd = du + w
             if nd <= d[v_i]
@@ -152,7 +143,7 @@ function bmsp!(g::CSRGraph{T, W}, d::Vector{W}, pr::Vector{T}, src::AbstractVect
                 d[v_i] = nd
                 pr[v_i] = u
                 @inbounds if nd < B
-                    sz = push_dec!(h, sz, v, nd)
+                    sz, dcnt = push_dec!(h, sz, dcnt, v, nd)
                 end
             end
         end
